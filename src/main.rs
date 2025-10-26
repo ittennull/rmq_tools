@@ -1,11 +1,13 @@
 mod api;
 mod args;
+mod database;
 mod dtos;
+mod rabbitmq;
 
-use crate::api::{list_queues, AppState, RmqClient};
 use crate::args::Args;
+use crate::database::Database;
+use crate::rabbitmq::Rabbitmq;
 use anyhow::Result;
-use axum::{routing::get, Router};
 use clap::Parser;
 use rabbitmq_http_client::api::Client;
 use url::Url;
@@ -14,8 +16,9 @@ use url::Url;
 async fn main() -> Result<()> {
     let args = Args::parse();
     let rmq_client = connect_to_rmq(&args)?;
+    let database = Database::new()?;
 
-    let app = build_api(rmq_client);
+    let app = api::build_api(rmq_client, database);
 
     println!("Web interface is on http://localhost:{}", args.port);
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", args.port)).await?;
@@ -23,7 +26,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn connect_to_rmq(args: &Args) -> Result<RmqClient> {
+fn connect_to_rmq(args: &Args) -> Result<Rabbitmq> {
     let url = Url::parse(&args.url)?;
     let endpoint = format!(
         "{}://{}:{}{}",
@@ -43,13 +46,5 @@ fn connect_to_rmq(args: &Args) -> Result<RmqClient> {
         url.password().expect("Password is missing").to_string(),
     );
 
-    Ok(RmqClient::new(client, args.vhost.clone()))
-}
-
-fn build_api(rmq_client: RmqClient) -> Router {
-    let state = AppState::new(rmq_client);
-
-    Router::new()
-        .route("/queues", get(list_queues))
-        .with_state(state)
+    Ok(Rabbitmq::new(client, args.vhost.clone()))
 }
