@@ -1,2 +1,10 @@
+# rust
 /target
 .idea
+
+# dotnet
+bin
+obj
+
+# sqlite
+*.db

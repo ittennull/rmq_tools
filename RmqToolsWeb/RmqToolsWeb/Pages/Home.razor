@@ -1,0 +1,45 @@
+﻿@page "/"
+@using RmqToolsWeb.Dtos
+@inject HttpClient Http
+<PageTitle>Queues</PageTitle>
+
+<MudDataGrid Items="@_queues" Dense="true" Hover="true" RowClick="@((DataGridRowClickEventArgs<ListQueueResponse> x) => OnRowClick(x))"
+             Filterable="true" FilterMode="DataGridFilterMode.ColumnFilterRow" FilterCaseSensitivity="DataGridFilterCaseSensitivity.CaseInsensitive">
+    <Columns>
+        <PropertyColumn Property="x => x.RemoteQueue.Name" Title="Queue"  />
+        <PropertyColumn Property="x => x.RemoteQueue.MessageCount" Title="Message count"/>
+        <TemplateColumn Title="Exclusive" Filterable="false">
+            <CellTemplate>
+                @if (context.Item.RemoteQueue.Exclusive)
+                {
+                    <MudChip T="string" Variant="Variant.Text" Color="Color.Secondary">exclusive</MudChip>
+                }
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Exists locally" Filterable="false">
+            <CellTemplate>
+                @if (context.Item.ExistsLocally)
+                {
+                    <MudIcon Icon="@Icons.Material.Rounded.Check" Title="API"/>
+                }
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+</MudDataGrid>
+
+
+@code
+{
+    List<ListQueueResponse> _queues = [];
+    
+    protected override async Task OnInitializedAsync()
+    {
+        _queues = (await Http.GetFromJsonAsync<List<ListQueueResponse>>("/api/queues", ApiSerialization.Options))!;
+        _queues.Sort((x, y) => String.Compare(x.RemoteQueue.Name, y.RemoteQueue.Name, StringComparison.Ordinal));
+    }
+
+    private void OnRowClick(DataGridRowClickEventArgs<ListQueueResponse> obj)
+    {
+        Console.WriteLine(obj.Item.RemoteQueue.Name);
+    }
+}
