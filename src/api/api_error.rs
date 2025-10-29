@@ -25,7 +25,7 @@ impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let text = match self {
             ApiError::Database(error) => {format!("{:?}", error.0)}
-            ApiError::RabbitMQ(error) => {format!("{:?}", error.0)}
+            ApiError::RabbitMQ(error) => {format!("{:?}", error)}
             ApiError::Http(error) => {format!("{:#}", error)}
         };
         (StatusCode::INTERNAL_SERVER_ERROR, text).into_response()

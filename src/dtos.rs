@@ -1,4 +1,11 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use crate::database::QueueId;
+
+#[derive(Serialize, Clone)]
+pub struct RmqConnectionInfo {
+    pub domain: String,
+    pub vhost: String,
+}
 
 #[derive(Serialize)]
 pub struct RemoteQueue {
@@ -9,7 +16,7 @@ pub struct RemoteQueue {
 
 #[derive(Serialize)]
 pub struct LocalQueue {
-    pub id: u64,
+    pub id: QueueId,
     pub name: String,
 }
 
@@ -17,6 +24,16 @@ pub struct LocalQueue {
 pub struct Message {
     pub id: u64,
     pub payload: String,
+}
+
+#[derive(Deserialize)]
+pub struct LoadMessagesByQueueNameRequest {
+    pub queue_name: String,
+}
+
+#[derive(Serialize)]
+pub struct LoadMessagesByQueueNameResponse {
+    pub messages: Vec<Message>,
 }
 
 pub mod list_queues {
@@ -32,6 +49,7 @@ pub mod list_queues {
 
 pub mod find_queue_by_name {
     use serde::{Deserialize, Serialize};
+    use crate::database::QueueId;
 
     #[derive(Deserialize)]
     pub struct FindQuery {
@@ -40,7 +58,7 @@ pub mod find_queue_by_name {
 
     #[derive(Serialize)]
     pub struct Response {
-        pub queue_id: u64,
+        pub queue_id: Option<QueueId>,
     }
 }
 
@@ -50,5 +68,14 @@ pub mod delete_messages{
     #[derive(Deserialize)]
     pub struct Request {
         pub message_ids: Vec<u64>,
+    }
+}
+
+pub mod load_messages{
+    use serde::Serialize;
+
+    #[derive(Serialize)]
+    pub struct Response {
+        pub queue_id: u64,
     }
 }

@@ -1,6 +1,8 @@
 use crate::dtos::{LocalQueue, Message};
 use anyhow::Result;
-use rusqlite::{Connection, Error};
+use rusqlite::{Connection, Error, OptionalExtension, ToSql};
+
+pub type QueueId = u64;
 
 pub struct Database {
     connection: Connection,
@@ -29,7 +31,7 @@ impl Database {
         connection.execute(
             "CREATE TABLE IF NOT EXISTS messages (
             id   INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-            queue_id TEXT NOT NULL UNIQUE,
+            queue_id TEXT NOT NULL,
             payload TEXT NOT NULL,
             FOREIGN KEY(queue_id) REFERENCES queues(id)
         )",
@@ -50,17 +52,17 @@ impl Database {
         Ok(vec.collect::<Result<Vec<_>, _>>()?)
     }
 
-    pub fn find_queue_by_name(&self, name: &str) -> Result<u64, DatabaseError> {
+    pub fn find_queue_by_name(&self, name: &str) -> Result<Option<QueueId>, DatabaseError> {
         let mut stmt = self
             .connection
             .prepare("SELECT id FROM queues WHERE name=?")?;
-        let result = stmt.query_one([name], |row| row.get(0))?;
+        let result = stmt.query_one([name], |row| row.get(0)).optional()?;
         Ok(result)
     }
 
     pub fn get_messages(
         &self,
-        queue_id: u64,
+        queue_id: QueueId,
         start: u32,
         take: u32,
     ) -> Result<Vec<Message>, DatabaseError> {
@@ -74,6 +76,44 @@ impl Database {
             })
         })?;
         Ok(vec.collect::<Result<Vec<_>, _>>()?)
+    }
+
+    pub fn create_queue(&self, name: &str) -> Result<QueueId, DatabaseError> {
+        self.connection
+            .execute("INSERT INTO queues (name) VALUES (?)", [name])?;
+        let queue_id = self
+            .find_queue_by_name(name)?
+            .expect("Queue ID does not exist, but it was just created");
+        Ok(queue_id)
+    }
+
+    pub fn save_messages(
+        &self,
+        queue_id: QueueId,
+        messages: &Vec<String>,
+    ) -> Result<(), DatabaseError> {
+        let vars = {
+            let mut s = String::new();
+            for i in (1..=2 * messages.len()).step_by(2) {
+                s.push_str(&format!("(?{},?{}),", i, i + 1));
+            }
+            // Remove trailing comma
+            s.pop();
+            s
+        };
+
+        let mut values: Vec<&dyn ToSql>=Vec::with_capacity(2*messages.len());
+        for message in messages {
+            values.push(&queue_id);
+            values.push(message);
+        }
+
+        let items: Vec<_> = messages.into_iter().map(|x| (queue_id, x)).collect();
+        self.connection.execute(
+            &format!("INSERT INTO messages (queue_id, payload) VALUES {vars}"),
+            &values[..],
+        )?;
+        Ok(())
     }
 
     pub fn delete_messages(&self, ids: &Vec<u64>) -> Result<(), DatabaseError> {

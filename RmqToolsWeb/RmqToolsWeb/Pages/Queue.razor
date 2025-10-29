@@ -1,59 +1,60 @@
-﻿@page "/weather"
+﻿@page "/{queueName}"
+@using RmqToolsWeb.Dtos
 @inject HttpClient Http
 
+<SectionContent SectionName="top-bar">
+    <MudStack Spacing="5" Row="true">
+        <div>
+            <div>@QueueName</div>
+            <div>@($"{_messages.Count} messages")</div>
+        </div>
 
-<h1>Weather</h1>
+        <div>
+            <MudButton Variant="Variant.Outlined" Color="Color.Tertiary" OnClick="LoadMessages">Load messages</MudButton>
+        </div>
+    </MudStack>
+</SectionContent>
 
-<p>This component demonstrates fetching data from the server.</p>
+<PageTitle>@QueueName</PageTitle>
 
-@if (forecasts == null)
-{
-    <p>
-        <em>Loading...</em>
-    </p>
-}
-else
-{
-    <table class="table">
-        <thead>
-        <tr>
-            <th>Date</th>
-            <th aria-label="Temperature in Celsius">Temp. (C)</th>
-            <th aria-label="Temperature in Farenheit">Temp. (F)</th>
-            <th>Summary</th>
-        </tr>
-        </thead>
-        <tbody>
-        @foreach (var forecast in forecasts)
-        {
-            <tr>
-                <td>@forecast.Date.ToShortDateString()</td>
-                <td>@forecast.TemperatureC</td>
-                <td>@forecast.TemperatureF</td>
-                <td>@forecast.Summary</td>
-            </tr>
-        }
-        </tbody>
-    </table>
-}
+<MudDataGrid Items="@_messages" Dense="true" Hover="true" Loading="@_loading"
+             Filterable="true" FilterMode="DataGridFilterMode.ColumnFilterRow" FilterCaseSensitivity="DataGridFilterCaseSensitivity.CaseInsensitive">
+    <Columns>
+        <PropertyColumn Property="x => x.Id" Title="Id" />
+        <TemplateColumn Title="Payload" >
+            <CellTemplate>
+                <pre>@context.Item.Payload</pre>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <PagerContent>
+        <MudDataGridPager T="Message" PageSizeOptions="@(new []{100, 1000, 10000})" />
+    </PagerContent>
+</MudDataGrid>
 
 @code {
-    private WeatherForecast[]? forecasts;
+    [Parameter]
+    public string QueueName { get; set; }
 
+    List<Message> _messages = [];
+    bool _loading;
+    
     protected override async Task OnInitializedAsync()
     {
-        forecasts = await Http.GetFromJsonAsync<WeatherForecast[]>("sample-data/weather.json");
+        await LoadMessages();
     }
 
-    public class WeatherForecast
+    async Task LoadMessages()
     {
-        public DateOnly Date { get; set; }
-
-        public int TemperatureC { get; set; }
-
-        public string? Summary { get; set; }
-
-        public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+        _loading = true;
+        try
+        {
+            using var response = await Http.PostAsync($"/api/queue/load?queue_name={QueueName}", null);
+            _messages = (await response.Content.ReadFromJsonAsync<LoadMessagesByQueueNameResponse>(MySourceGenerationContext.Default.LoadMessagesByQueueNameResponse))!.Messages;
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
-
 }

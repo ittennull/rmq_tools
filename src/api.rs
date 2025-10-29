@@ -2,18 +2,22 @@ mod api_error;
 
 use crate::api::api_error::ApiError;
 use crate::database::Database;
-use crate::dtos::{delete_messages, find_queue_by_name, list_queues, Message};
+use crate::dtos::{
+    delete_messages, find_queue_by_name, list_queues, LoadMessagesByQueueNameRequest,
+    LoadMessagesByQueueNameResponse, Message, RmqConnectionInfo,
+};
 use crate::rabbitmq::Rabbitmq;
 use anyhow::{anyhow, Result};
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderValue;
-use axum::routing::{delete, get};
+use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use axum_macros::debug_handler;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
-use tower_http::services::ServeDir;
+use tower_http::follow_redirect::policy::PolicyExt;
+use tower_http::services::{ServeDir, ServeFile};
 
 struct GuardedData {
     rabbitmq: Rabbitmq,
@@ -23,11 +27,13 @@ struct GuardedData {
 #[derive(Clone)]
 pub struct AppState {
     guarded: Arc<Mutex<GuardedData>>,
+    rmq_connection_info: RmqConnectionInfo,
 }
 
 impl AppState {
     pub fn new(rabbitmq: Rabbitmq, database: Database) -> Self {
         Self {
+            rmq_connection_info: rabbitmq.get_connection_info(),
             guarded: Arc::new(Mutex::new(GuardedData { rabbitmq, database })),
         }
     }
@@ -44,14 +50,20 @@ pub fn build_api(rmq_client: Rabbitmq, database: Database) -> Router {
         .nest(
             "/api",
             Router::new()
-                .route("/queues", get(list_queues))
+                .route("/rmq_connection", get(get_rmq_connection_info))
                 .route("/queue", get(find_queue_by_name))
+                .route("/queue/load", post(load_messages_by_queue_name))
+                .route("/queues", get(list_queues))
                 .route("/queues/{queue_id}/messages", get(get_messages))
                 .route("/messages", delete(delete_messages))
                 .with_state(state)
                 .layer(cors_layer),
         )
-        .fallback_service(ServeDir::new("static"))
+        .fallback_service(ServeDir::new("static").fallback(ServeFile::new("static/index.html")))
+}
+
+async fn get_rmq_connection_info(State(state): State<AppState>) -> Json<RmqConnectionInfo> {
+    Json(state.rmq_connection_info)
 }
 
 #[debug_handler]
@@ -114,8 +126,34 @@ pub async fn delete_messages(
     Ok(())
 }
 
-pub async fn update_message() -> Result<()> {
-    Ok(())
+pub async fn load_messages_by_queue_name(
+    State(state): State<AppState>,
+    Query(query): Query<LoadMessagesByQueueNameRequest>,
+) -> Result<Json<LoadMessagesByQueueNameResponse>, ApiError> {
+    let guarded = state.guarded.lock().await;
+
+    let queue_id = match guarded.database.find_queue_by_name(&query.queue_name)? {
+        None => guarded.database.create_queue(&query.queue_name)?,
+        Some(queue_id) => queue_id,
+    };
+
+    let rmq_messages = guarded
+        .rabbitmq
+        .load_messages(&query.queue_name)
+        .await?
+        .into_iter()
+        .map(|x| x.payload)
+        .collect::<Vec<_>>();
+
+    if !rmq_messages.is_empty() {
+        guarded.database.save_messages(queue_id, &rmq_messages)?;
+    }
+
+    let db_messages = guarded.database.get_messages(queue_id, 0, 100)?;
+
+    Ok(Json(LoadMessagesByQueueNameResponse {
+        messages: db_messages,
+    }))
 }
 
 pub async fn clear_queue() -> Result<()> {

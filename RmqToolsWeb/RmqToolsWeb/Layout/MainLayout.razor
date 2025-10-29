@@ -1,4 +1,7 @@
-﻿@inherits LayoutComponentBase
+﻿@using RmqToolsWeb.Dtos
+@inherits LayoutComponentBase
+@inject HttpClient Http
+@inject NavigationManager Navigation
 
 @* Required *@
 <MudThemeProvider />
@@ -10,4 +13,35 @@
 @* Needed for snackbars *@
 <MudSnackbarProvider />
 
-@Body
+<MudLayout>
+    <MudAppBar Color="Color.Primary" Fixed="false" Dense="true" Class="sticky" Style="top: 0;">
+        <MudIconButton Icon="@Icons.Material.Filled.Home" Color="Color.Inherit" Size="Size.Large" Edge="Edge.Start" OnClick="GoHome" />
+        
+        @if (_rmqConnectionInfo != null)
+        {
+            <div class="mx-5">
+                <div>@_rmqConnectionInfo.Domain</div>
+                <div>@_rmqConnectionInfo.Vhost</div>
+            </div>
+        }
+        <SectionOutlet SectionName="top-bar"/>
+    </MudAppBar>
+
+    <MudMainContent Class="pt-8">
+        @Body
+    </MudMainContent>
+</MudLayout>
+
+@code{
+    RmqConnectionInfo? _rmqConnectionInfo;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _rmqConnectionInfo = await Http.GetFromJsonAsync<RmqConnectionInfo>("/api/rmq_connection", MySourceGenerationContext.Default.RmqConnectionInfo);
+    }
+
+    void GoHome()
+    {
+        Navigation.NavigateTo("/");
+    }
+}
