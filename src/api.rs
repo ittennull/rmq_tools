@@ -3,8 +3,8 @@ mod api_error;
 use crate::api::api_error::ApiError;
 use crate::database::Database;
 use crate::dtos::{
-    DeleteMessagesRequest, LoadMessagesByQueueNameQuery, LoadMessagesByQueueNameResponse,
-    Message, QueueSummary, RmqConnectionInfo,
+    DeleteMessagesRequest, LoadMessagesByQueueNameQuery, LoadMessagesByQueueNameResponse, Message,
+    QueueSummary, RmqConnectionInfo,
 };
 use crate::rabbitmq::Rabbitmq;
 use anyhow::{anyhow, Result};
@@ -16,7 +16,6 @@ use axum_macros::debug_handler;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
-use tower_http::follow_redirect::policy::PolicyExt;
 use tower_http::services::{ServeDir, ServeFile};
 
 struct GuardedData {
@@ -93,7 +92,7 @@ async fn get_messages(
     Path(queue_id): Path<u64>,
 ) -> Result<Json<Vec<Message>>, ApiError> {
     let guarded = state.guarded.lock().await;
-    let messages = guarded.database.get_messages(queue_id, 0, 100)?;
+    let messages = guarded.database.get_messages(queue_id)?;
     Ok(Json(messages))
 }
 
@@ -139,13 +138,9 @@ pub async fn load_messages_by_queue_name(
         guarded.database.save_messages(queue_id, &rmq_messages)?;
     }
 
-    let db_messages = guarded.database.get_messages(queue_id, 0, 100)?;
+    let db_messages = guarded.database.get_messages(queue_id)?;
 
     Ok(Json(LoadMessagesByQueueNameResponse {
         messages: db_messages,
     }))
-}
-
-pub async fn clear_queue() -> Result<()> {
-    Ok(())
 }

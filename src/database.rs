@@ -1,4 +1,4 @@
-use crate::dtos::{Message};
+use crate::dtos::Message;
 use crate::types::db_types::LocalQueue;
 use anyhow::Result;
 use rusqlite::{Connection, Error, OptionalExtension, ToSql};
@@ -45,7 +45,7 @@ impl Database {
     pub fn get_queues(&self) -> Result<Vec<LocalQueue>, DatabaseError> {
         let mut stmt = self.connection.prepare(
             r#"
-            SELECT q.id, q.name, coalesce(m.count, 0) FROM queues q
+            SELECT q.name, coalesce(m.count, 0) FROM queues q
             LEFT JOIN (
                 SELECT queue_id, count(*) as count FROM messages
                 GROUP BY queue_id
@@ -54,9 +54,8 @@ impl Database {
         )?;
         let vec = stmt.query_map([], |row| {
             Ok(LocalQueue {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                message_count: row.get(2)?,
+                name: row.get(0)?,
+                message_count: row.get(1)?,
             })
         })?;
         Ok(vec.collect::<Result<Vec<_>, _>>()?)
@@ -70,12 +69,7 @@ impl Database {
         Ok(result)
     }
 
-    pub fn get_messages(
-        &self,
-        queue_id: QueueId,
-        start: u32,
-        take: u32,
-    ) -> Result<Vec<Message>, DatabaseError> {
+    pub fn get_messages(&self, queue_id: QueueId) -> Result<Vec<Message>, DatabaseError> {
         let mut stmt = self
             .connection
             .prepare("SELECT id, payload FROM messages WHERE queue_id = ?")?;
@@ -118,7 +112,6 @@ impl Database {
             values.push(message);
         }
 
-        let items: Vec<_> = messages.into_iter().map(|x| (queue_id, x)).collect();
         self.connection.execute(
             &format!("INSERT INTO messages (queue_id, payload) VALUES {vars}"),
             &values[..],
