@@ -3,8 +3,8 @@ mod api_error;
 use crate::api::api_error::ApiError;
 use crate::database::Database;
 use crate::dtos::{
-    delete_messages, find_queue_by_name, list_queues, LoadMessagesByQueueNameRequest,
-    LoadMessagesByQueueNameResponse, Message, RmqConnectionInfo,
+    DeleteMessagesRequest, LoadMessagesByQueueNameQuery, LoadMessagesByQueueNameResponse,
+    Message, QueueSummary, RmqConnectionInfo,
 };
 use crate::rabbitmq::Rabbitmq;
 use anyhow::{anyhow, Result};
@@ -51,7 +51,6 @@ pub fn build_api(rmq_client: Rabbitmq, database: Database) -> Router {
             "/api",
             Router::new()
                 .route("/rmq_connection", get(get_rmq_connection_info))
-                .route("/queue", get(find_queue_by_name))
                 .route("/queue/load", post(load_messages_by_queue_name))
                 .route("/queues", get(list_queues))
                 .route("/queues/{queue_id}/messages", get(get_messages))
@@ -67,9 +66,7 @@ async fn get_rmq_connection_info(State(state): State<AppState>) -> Json<RmqConne
 }
 
 #[debug_handler]
-async fn list_queues(
-    State(state): State<AppState>,
-) -> Result<Json<Vec<list_queues::Queue>>, ApiError> {
+async fn list_queues(State(state): State<AppState>) -> Result<Json<Vec<QueueSummary>>, ApiError> {
     let guarded = state.guarded.lock().await;
 
     let remote_queues = guarded.rabbitmq.list_queues().await?;
@@ -78,24 +75,17 @@ async fn list_queues(
     let queues: Vec<_> = remote_queues
         .into_iter()
         .map(|remote_queue| {
-            let exists_locally = local_queues.iter().any(|q| q.name == remote_queue.name);
-            list_queues::Queue {
-                remote_queue,
-                exists_locally,
+            let local_queue = local_queues.iter().find(|q| q.name == remote_queue.name);
+            QueueSummary {
+                name: remote_queue.name,
+                message_count_in_rmq: remote_queue.message_count,
+                message_count_in_db: local_queue.map(|x| x.message_count),
+                exclusive: remote_queue.exclusive,
             }
         })
         .collect();
 
     Ok(Json::from(queues))
-}
-
-async fn find_queue_by_name(
-    State(state): State<AppState>,
-    Query(find_queue_by_name::FindQuery { name }): Query<find_queue_by_name::FindQuery>,
-) -> Result<Json<find_queue_by_name::Response>, ApiError> {
-    let guarded = state.guarded.lock().await;
-    let queue_id = guarded.database.find_queue_by_name(&name)?;
-    Ok(Json(find_queue_by_name::Response { queue_id }))
 }
 
 async fn get_messages(
@@ -113,7 +103,7 @@ pub async fn send_messages() -> Result<()> {
 
 pub async fn delete_messages(
     State(state): State<AppState>,
-    Json(request): Json<delete_messages::Request>,
+    Json(request): Json<DeleteMessagesRequest>,
 ) -> Result<(), ApiError> {
     if request.message_ids.is_empty() {
         return Err(ApiError::Http(anyhow!(
@@ -128,7 +118,7 @@ pub async fn delete_messages(
 
 pub async fn load_messages_by_queue_name(
     State(state): State<AppState>,
-    Query(query): Query<LoadMessagesByQueueNameRequest>,
+    Query(query): Query<LoadMessagesByQueueNameQuery>,
 ) -> Result<Json<LoadMessagesByQueueNameResponse>, ApiError> {
     let guarded = state.guarded.lock().await;
 

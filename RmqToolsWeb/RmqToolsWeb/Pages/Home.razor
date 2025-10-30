@@ -3,27 +3,36 @@
 @inject HttpClient Http
 @inject NavigationManager Navigation
 
+<SectionContent SectionName="top-bar">
+    @{
+        var queues = _queues.Count(x => x.MessageCountInDb > 0);
+        var messages = _queues.Sum(x => x.MessageCountInDb);
+    }
+    
+    <div>
+        <div>
+            @queues local queue@(queues == 1 ? "" : "s")
+        </div>
+        <div>
+            @messages local message@(messages == 1 ? "" : "s")
+        </div>
+    </div>
+</SectionContent>
+
 <PageTitle>Queues</PageTitle>
 
-<MudDataGrid Items="@_queues" Dense="true" Hover="true" RowClick="@((DataGridRowClickEventArgs<ListQueueResponse> x) => OnRowClick(x))" 
+<MudDataGrid Items="@_queues" Dense="true" Hover="true" RowClick="@((DataGridRowClickEventArgs<QueueSummary> x) => OnRowClick(x))" 
              RowClass="cursor-pointer"
              Filterable="true" FilterMode="DataGridFilterMode.ColumnFilterRow" FilterCaseSensitivity="DataGridFilterCaseSensitivity.CaseInsensitive">
     <Columns>
-        <PropertyColumn Property="x => x.RemoteQueue.Name" Title="Queue" />
-        <PropertyColumn Property="x => x.RemoteQueue.MessageCount" Title="Message count"/>
+        <PropertyColumn Property="x => x.Name" Title="Queue" />
+        <PropertyColumn Property="x => x.MessageCountInRmq" Title="Message count in RMQ"/>
+        <PropertyColumn Property="x => x.MessageCountInDb" Title="Message count in DB"/>
         <TemplateColumn Title="Exclusive" Filterable="false">
             <CellTemplate>
-                @if (context.Item.RemoteQueue.Exclusive)
+                @if (context.Item.Exclusive)
                 {
                     <MudChip T="string" Variant="Variant.Text" Color="Color.Secondary">exclusive</MudChip>
-                }
-            </CellTemplate>
-        </TemplateColumn>
-        <TemplateColumn Title="Exists locally" Filterable="false">
-            <CellTemplate>
-                @if (context.Item.ExistsLocally)
-                {
-                    <MudIcon Icon="@Icons.Material.Rounded.Check" Title="API"/>
                 }
             </CellTemplate>
         </TemplateColumn>
@@ -33,16 +42,17 @@
 
 @code
 {
-    List<ListQueueResponse> _queues = [];
+    List<QueueSummary> _queues = [];
     
     protected override async Task OnInitializedAsync()
     {
-        _queues = (await Http.GetFromJsonAsync<List<ListQueueResponse>>("/api/queues", MySourceGenerationContext.Default.ListListQueueResponse))!;
-        _queues.Sort((x, y) => String.Compare(x.RemoteQueue.Name, y.RemoteQueue.Name, StringComparison.Ordinal));
+        _queues = (await Http.GetFromJsonAsync<List<QueueSummary>>("/api/queues", MySourceGenerationContext.Default.ListQueueSummary))!;
+        _queues.Sort((x, y) => String.Compare(x.Name, y.Name, StringComparison.Ordinal));
     }
 
-    private void OnRowClick(DataGridRowClickEventArgs<ListQueueResponse> obj)
+    private void OnRowClick(DataGridRowClickEventArgs<QueueSummary> obj)
     {
-        Navigation.NavigateTo($"/{obj.Item.RemoteQueue.Name}");
+        if (!obj.Item.Exclusive)
+            Navigation.NavigateTo($"/{obj.Item.Name}");
     }
 }

@@ -1,4 +1,5 @@
-use crate::dtos::{LocalQueue, Message};
+use crate::dtos::{Message};
+use crate::types::db_types::LocalQueue;
 use anyhow::Result;
 use rusqlite::{Connection, Error, OptionalExtension, ToSql};
 
@@ -42,11 +43,20 @@ impl Database {
     }
 
     pub fn get_queues(&self) -> Result<Vec<LocalQueue>, DatabaseError> {
-        let mut stmt = self.connection.prepare("SELECT id, name FROM queues")?;
+        let mut stmt = self.connection.prepare(
+            r#"
+            SELECT q.id, q.name, coalesce(m.count, 0) FROM queues q
+            LEFT JOIN (
+                SELECT queue_id, count(*) as count FROM messages
+                GROUP BY queue_id
+                ) m ON m.queue_id = q.id
+        "#,
+        )?;
         let vec = stmt.query_map([], |row| {
             Ok(LocalQueue {
                 id: row.get(0)?,
                 name: row.get(1)?,
+                message_count: row.get(2)?,
             })
         })?;
         Ok(vec.collect::<Result<Vec<_>, _>>()?)
@@ -102,7 +112,7 @@ impl Database {
             s
         };
 
-        let mut values: Vec<&dyn ToSql>=Vec::with_capacity(2*messages.len());
+        let mut values: Vec<&dyn ToSql> = Vec::with_capacity(2 * messages.len());
         for message in messages {
             values.push(&queue_id);
             values.push(message);

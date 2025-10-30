@@ -3,6 +3,7 @@ mod args;
 mod database;
 mod dtos;
 mod rabbitmq;
+mod types;
 
 use crate::args::Args;
 use crate::database::Database;

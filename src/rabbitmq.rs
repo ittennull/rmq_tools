@@ -1,4 +1,5 @@
-use crate::dtos::{RemoteQueue, RmqConnectionInfo};
+use crate::dtos::RmqConnectionInfo;
+use crate::types::rmq_types::RemoteQueue;
 use anyhow::anyhow;
 use rabbitmq_http_client::api::{Client, HttpClientError};
 use rabbitmq_http_client::responses::GetMessage;
