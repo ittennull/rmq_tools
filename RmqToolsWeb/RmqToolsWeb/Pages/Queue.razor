@@ -6,12 +6,38 @@
     <MudStack Spacing="5" Row="true">
         <div>
             <div>@QueueName</div>
-            <div>@($"{_messages.Count} messages")</div>
+            <div>
+                @_numberOfRemoteMessages messages in RMQ
+                 • 
+                @(_messages.Count) messages in DB
+            </div>
         </div>
 
         <div>
-            <MudButton Variant="Variant.Outlined" Color="Color.Tertiary" OnClick="LoadMessages">Load messages</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Info" OnClick="LoadMessages">Load messages</MudButton>
         </div>
+    </MudStack>
+    
+    <MudSpacer />
+    
+    <MudStack Spacing="1" Row="true">
+        @if (_selectedIds.Count > 0)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.Close" Color="Color.Inherit" OnClick="UnselectAll" title="Unselect all"/>
+            <MudText Class="align-content-center" Color="Color.Info">@($"{_selectedIds.Count} selected")</MudText>
+        }
+    </MudStack>
+    
+    <MudStack Spacing="1" Row="true" Class="ml-5">
+        <MudSelect @bind-Value="_moveToQueue" Variant="Variant.Outlined" Label="Send to queue" Margin="Margin.Dense" Dense="true" FitContent="true">
+            @foreach (var queueName in _queueNames)
+            {
+                <MudSelectItem Value="queueName"/>
+            }
+        </MudSelect>
+        
+        <MudIconButton Icon="@Icons.Material.Filled.Send" Color="Color.Warning" OnClick="SendMessagesToQueue" title="Send messages to specified queue"/>
+        <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" Color="Color.Error" OnClick="DeleteMessages" title="Delete messages"/>
     </MudStack>
 </SectionContent>
 
@@ -24,23 +50,39 @@
         <TemplateColumn Title="Payload" >
             <CellTemplate>
                 <pre>@context.Item.Payload</pre>
+                <MudButton Color="Color.Secondary" OnClick="@(() => SelectMessage(context.Item.Id))">Select</MudButton>
             </CellTemplate>
         </TemplateColumn>
     </Columns>
     <PagerContent>
-        <MudDataGridPager T="Message" PageSizeOptions="@(new []{100, 1000, 10000})" />
+        <MudDataGridPager T="Message" PageSizeOptions="@([100, 1000, 10000])" />
     </PagerContent>
 </MudDataGrid>
 
 @code {
     [Parameter]
-    public string QueueName { get; set; }
+    public required string QueueName { get; set; }
 
     List<Message> _messages = [];
     bool _loading;
+    HashSet<uint> _selectedIds = [];
+    string _moveToQueue = "";
+    string[] _queueNames = [];
+    int _numberOfRemoteMessages;
     
     protected override async Task OnInitializedAsync()
     {
+        _moveToQueue = QueueName;
+
+        var queues = (await Http.GetFromJsonAsync<List<QueueSummary>>("/api/queues", MySourceGenerationContext.Default.ListQueueSummary))!;
+        _queueNames = queues
+            .Where(x => !x.Exclusive)
+            .Select(x => x.Name)
+            .Order()
+            .ToArray();
+
+        _numberOfRemoteMessages = queues.SingleOrDefault(x => x.Name == QueueName)?.MessageCountInRmq ?? 0;
+        
         await LoadMessages();
     }
 
@@ -56,5 +98,25 @@
         {
             _loading = false;
         }
+    }
+
+    void SelectMessage(uint id)
+    {
+        _selectedIds.Add(id);
+    }
+
+    void UnselectAll()
+    {
+        _selectedIds.Clear();
+    }
+
+    async Task DeleteMessages()
+    {
+        
+    }
+    
+    async Task SendMessagesToQueue()
+    {
+        
     }
 }

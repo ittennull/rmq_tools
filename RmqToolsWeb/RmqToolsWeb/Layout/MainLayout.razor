@@ -14,9 +14,10 @@
 <MudSnackbarProvider />
 
 <MudLayout>
-    <MudAppBar Color="Color.Primary" Fixed="false" Dense="true" Class="sticky" Style="top: 0;">
-        <MudIconButton Icon="@Icons.Material.Filled.Home" Color="Color.Inherit" Size="Size.Large" Edge="Edge.Start" OnClick="GoHome" />
-        
+    <MudAppBar Elevation="1" Dense="false" Class="sticky mud-dark-text" Style=@($"top: 0; background:{Colors.BlueGray.Lighten5};")>
+        <MudIconButton Icon="@Icons.Material.Filled.Home" Color="Color.Inherit" Size="Size.Large" Edge="Edge.Start" OnClick="GoHome"/>
+        <MudDivider Vertical="true" FlexItem="true" Class="ml-3"/>
+
         @if (_rmqConnectionInfo != null)
         {
             <div class="mx-5">
@@ -24,6 +25,8 @@
                 <div>@_rmqConnectionInfo.Vhost</div>
             </div>
         }
+        <MudDivider Vertical="true" FlexItem="true" Class="mr-5"/>
+
         <SectionOutlet SectionName="top-bar"/>
     </MudAppBar>
 
