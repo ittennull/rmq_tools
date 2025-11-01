@@ -7,7 +7,7 @@ use crate::dtos::{
     QueueSummary, RmqConnectionInfo,
 };
 use crate::rabbitmq::Rabbitmq;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderValue;
 use axum::routing::{delete, get, post};
@@ -43,6 +43,7 @@ pub fn build_api(rmq_client: Rabbitmq, database: Database) -> Router {
 
     let cors_layer = CorsLayer::new()
         .allow_methods(Any)
+        .allow_headers(Any)
         .allow_origin("http://localhost:5009".parse::<HeaderValue>().unwrap());
 
     Router::new()
@@ -53,7 +54,7 @@ pub fn build_api(rmq_client: Rabbitmq, database: Database) -> Router {
                 .route("/queue/load", post(load_messages_by_queue_name))
                 .route("/queues", get(list_queues))
                 .route("/queues/{queue_id}/messages", get(get_messages))
-                .route("/messages", delete(delete_messages))
+                .route("/queues/{queue_id}/messages", delete(delete_messages))
                 .with_state(state)
                 .layer(cors_layer),
         )
@@ -103,16 +104,15 @@ pub async fn send_messages() -> Result<()> {
 
 pub async fn delete_messages(
     State(state): State<AppState>,
+    Path(queue_id): Path<u64>,
     Json(request): Json<DeleteMessagesRequest>,
 ) -> Result<(), ApiError> {
-    if request.message_ids.is_empty() {
-        return Err(ApiError::Http(anyhow!(
-            "message_ids array must contain at least one id"
-        )));
-    }
-
     let guarded = state.guarded.lock().await;
-    guarded.database.delete_messages(&request.message_ids)?;
+    if request.message_ids.is_empty() {
+        guarded.database.delete_all_messages(queue_id)?;
+    } else {
+        guarded.database.delete_messages(&request.message_ids)?;
+    }
     Ok(())
 }
 

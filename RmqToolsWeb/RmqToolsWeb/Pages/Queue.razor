@@ -1,4 +1,5 @@
 ﻿@page "/{queueName}"
+@using System.Text.Json
 @using RmqToolsWeb.Dtos
 @inject HttpClient Http
 
@@ -17,10 +18,10 @@
     <MudSpacer />
     
     <MudStack Spacing="1" Row="true">
-        @if (_selectedIds.Count > 0)
+        @if (_selectedMessages.Count > 0)
         {
             <MudIconButton Icon="@Icons.Material.Filled.Close" Color="Color.Inherit" OnClick="UnselectAll" title="Unselect all"/>
-            <MudText Class="align-content-center" Color="Color.Info">@($"{_selectedIds.Count} selected")</MudText>
+            <MudText Class="align-content-center" Color="Color.Info">@($"{_selectedMessages.Count} selected")</MudText>
         }
     </MudStack>
     
@@ -35,26 +36,32 @@
         </MudSelect>
         
         @{
-            var howMany = _selectedIds.Count > 0 ? $"{_selectedIds.Count}" : "all";
-            var messages = _selectedIds.Count == 1 ? "message" : "messages";
+            var howMany = _selectedMessages.Count > 0 ? $"{_selectedMessages.Count}" : "all";
+            var messages = _selectedMessages.Count == 1 ? "message" : "messages";
         }
         <MudIconButton Icon="@Icons.Material.Filled.Send" Color="Color.Warning" OnClick="SendMessagesToQueue" title="@($"Send {howMany} {messages} to specified queue")"/>
-        <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" Color="Color.Error" OnClick="DeleteMessages" title="@($"Delete {howMany} {messages}")"/>
+        <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" Color="Color.Error" OnClick="DeleteMessages" title="@($"Delete {howMany} {messages}")" Disabled="@(_queueId == null)"/>
     </MudStack>
 </SectionContent>
 
 <PageTitle>@QueueName</PageTitle>
 
-<MudDataGrid Items="@_messages" Dense="true" Hover="true" Loading="@_loading"
+<MudDataGrid Items="@_messages" Dense="true" Hover="true" Loading="@_loading" Hideable="true" ShowMenuIcon="true"
+             ColumnsPanelReordering="true"
+             MultiSelection="true" @bind-SelectedItems="_selectedMessages" SelectOnRowClick="false"
              Filterable="true" FilterMode="DataGridFilterMode.ColumnFilterRow" FilterCaseSensitivity="DataGridFilterCaseSensitivity.CaseInsensitive">
     <Columns>
-        <PropertyColumn Property="x => x.Id" Title="Id" />
-        <TemplateColumn Title="Payload" >
+        <SelectColumn T="Message" Hideable="false" />
+        <PropertyColumn Property="x => x.Payload" Title="Headers">
             <CellTemplate>
                 <pre>@context.Item.Payload</pre>
-                <MudButton Color="Color.Secondary" OnClick="@(() => SelectMessage(context.Item.Id))">Select</MudButton>
             </CellTemplate>
-        </TemplateColumn>
+        </PropertyColumn>
+        <PropertyColumn Property="x => x.Payload" Title="Payload">
+            <CellTemplate>
+                <pre>@context.Item.Payload</pre>
+            </CellTemplate>
+        </PropertyColumn>
     </Columns>
     <PagerContent>
         <MudDataGridPager T="Message" PageSizeOptions="@([100, 1000, 10000])" />
@@ -67,10 +74,11 @@
 
     List<Message> _messages = [];
     bool _loading;
-    HashSet<uint> _selectedIds = [];
+    HashSet<Message> _selectedMessages = [];
     string _moveToQueue = "";
     string[] _queueNames = [];
     int _numberOfRemoteMessages;
+    uint? _queueId;
     
     protected override async Task OnInitializedAsync()
     {
@@ -86,9 +94,12 @@
         if (queues.SingleOrDefault(x => x.Name == QueueName) is { } requestedQueue)
         {
             _numberOfRemoteMessages = requestedQueue.MessageCountInRmq;
-            
+
             if (requestedQueue.QueueId != null)
-                _messages = (await Http.GetFromJsonAsync<List<Message>>($"/api/queues/{requestedQueue.QueueId}/messages", MySourceGenerationContext.Default.ListMessage))!;
+            {
+                _queueId = requestedQueue.QueueId;
+                _messages = (await Http.GetFromJsonAsync<List<Message>>($"/api/queues/{_queueId}/messages", MySourceGenerationContext.Default.ListMessage))!;
+            }
         }
     }
 
@@ -99,6 +110,7 @@
         {
             using var response = await Http.PostAsync($"/api/queue/load?queue_name={QueueName}", null);
             _messages = (await response.Content.ReadFromJsonAsync<LoadMessagesByQueueNameResponse>(MySourceGenerationContext.Default.LoadMessagesByQueueNameResponse))!.Messages;
+            _numberOfRemoteMessages = 0;
         }
         finally
         {
@@ -106,19 +118,25 @@
         }
     }
 
-    void SelectMessage(uint id)
-    {
-        _selectedIds.Add(id);
-    }
-
     void UnselectAll()
     {
-        _selectedIds.Clear();
+        _selectedMessages.Clear();
     }
 
     async Task DeleteMessages()
     {
-        
+        var body = new DeleteMessagesRequest(_selectedMessages.Select(x => x.Id));
+        using var httpRequestMessage = new HttpRequestMessage(HttpMethod.Delete, $"/api/queues/{_queueId}/messages");
+        httpRequestMessage.Content = new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(body, MySourceGenerationContext.Default.DeleteMessagesRequest));
+        httpRequestMessage.Content.Headers.ContentType = new("application/json");
+        using var response = await Http.SendAsync(httpRequestMessage);
+        response.EnsureSuccessStatusCode();
+
+        if (_selectedMessages.Count == 0)
+            _messages.Clear();
+        else
+            _messages.RemoveAll(x => _selectedMessages.Contains(x));
+        _selectedMessages.Clear();
     }
     
     async Task SendMessagesToQueue()

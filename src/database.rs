@@ -128,6 +128,12 @@ impl Database {
         )?;
         Ok(())
     }
+
+    pub fn delete_all_messages(&self, queue_id: QueueId) -> Result<(), DatabaseError> {
+        self.connection
+            .execute("DELETE FROM messages WHERE queue_id=?", [queue_id])?;
+        Ok(())
+    }
 }
 
 fn repeat_vars(count: usize) -> String {
