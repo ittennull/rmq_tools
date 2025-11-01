@@ -1,10 +1,10 @@
 mod api_error;
 
 use crate::api::api_error::ApiError;
-use crate::database::Database;
+use crate::database::{Database, MessageSelector, QueueId};
 use crate::dtos::{
     DeleteMessagesRequest, LoadMessagesByQueueNameQuery, LoadMessagesByQueueNameResponse, Message,
-    QueueSummary, RmqConnectionInfo,
+    QueueSummary, RmqConnectionInfo, SendMessagesRequest,
 };
 use crate::rabbitmq::Rabbitmq;
 use anyhow::Result;
@@ -13,6 +13,7 @@ use axum::http::HeaderValue;
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use axum_macros::debug_handler;
+use std::iter;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
@@ -55,6 +56,7 @@ pub fn build_api(rmq_client: Rabbitmq, database: Database) -> Router {
                 .route("/queues", get(list_queues))
                 .route("/queues/{queue_id}/messages", get(get_messages))
                 .route("/queues/{queue_id}/messages", delete(delete_messages))
+                .route("/queues/{queue_id}/messages/send", post(send_messages))
                 .with_state(state)
                 .layer(cors_layer),
         )
@@ -91,28 +93,60 @@ async fn list_queues(State(state): State<AppState>) -> Result<Json<Vec<QueueSumm
 
 async fn get_messages(
     State(state): State<AppState>,
-    Path(queue_id): Path<u64>,
+    Path(queue_id): Path<QueueId>,
 ) -> Result<Json<Vec<Message>>, ApiError> {
     let guarded = state.guarded.lock().await;
-    let messages = guarded.database.get_messages(queue_id)?;
+    let messages = guarded
+        .database
+        .get_messages(&MessageSelector::AllInQueue(queue_id))?;
     Ok(Json(messages))
 }
 
-pub async fn send_messages() -> Result<()> {
+pub async fn send_messages(
+    State(state): State<AppState>,
+    Path(queue_id): Path<QueueId>,
+    Json(request): Json<SendMessagesRequest>,
+) -> Result<(), ApiError> {
+    let guarded = state.guarded.lock().await;
+
+    // get messages from database
+    let message_selector = match &request.message_ids[..] {
+        &[] => MessageSelector::AllInQueue(queue_id),
+        ids => MessageSelector::WithIds(ids),
+    };
+    let messages = guarded.database.get_messages(&message_selector)?;
+
+    // publish messages
+    for message in messages {
+        guarded
+            .rabbitmq
+            .send_message(
+                &request.destination_queue_name,
+                &message.payload,
+                iter::empty(),
+            )
+            .await?;
+    }
+
+    // delete messages
+    guarded.database.delete_messages(&message_selector)?;
+
     Ok(())
 }
 
 pub async fn delete_messages(
     State(state): State<AppState>,
-    Path(queue_id): Path<u64>,
+    Path(queue_id): Path<QueueId>,
     Json(request): Json<DeleteMessagesRequest>,
 ) -> Result<(), ApiError> {
+    let message_selector = match &request.message_ids[..] {
+        &[] => MessageSelector::AllInQueue(queue_id),
+        ids => MessageSelector::WithIds(ids),
+    };
+
     let guarded = state.guarded.lock().await;
-    if request.message_ids.is_empty() {
-        guarded.database.delete_all_messages(queue_id)?;
-    } else {
-        guarded.database.delete_messages(&request.message_ids)?;
-    }
+    guarded.database.delete_messages(&message_selector)?;
+
     Ok(())
 }
 
@@ -139,9 +173,9 @@ pub async fn load_messages_by_queue_name(
         guarded.database.save_messages(queue_id, &rmq_messages)?;
     }
 
-    let db_messages = guarded.database.get_messages(queue_id)?;
+    let messages = guarded
+        .database
+        .get_messages(&MessageSelector::AllInQueue(queue_id))?;
 
-    Ok(Json(LoadMessagesByQueueNameResponse {
-        messages: db_messages,
-    }))
+    Ok(Json(LoadMessagesByQueueNameResponse { queue_id, messages }))
 }

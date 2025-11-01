@@ -2,7 +2,9 @@ use crate::dtos::RmqConnectionInfo;
 use crate::types::rmq_types::RemoteQueue;
 use anyhow::anyhow;
 use rabbitmq_http_client::api::{Client, HttpClientError};
+use rabbitmq_http_client::requests::shovels::MessageProperties;
 use rabbitmq_http_client::responses::GetMessage;
+use serde_json::Value;
 use url::Url;
 
 pub struct Rabbitmq {
@@ -95,5 +97,18 @@ impl Rabbitmq {
             .await?;
 
         Ok(messages)
+    }
+
+    pub async fn send_message(
+        &self,
+        to_queue: &str,
+        payload: &str,
+        props: impl IntoIterator<Item = (String, Value)>,
+    ) -> Result<(), RabbitMQError> {
+        let properties = MessageProperties::from_iter(props);
+        self.client
+            .publish_message(&self.vhost, "", &to_queue, payload, properties)
+            .await?;
+        Ok(())
     }
 }

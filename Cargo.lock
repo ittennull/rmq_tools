@@ -1245,6 +1245,7 @@ dependencies = [
  "rabbitmq_http_client",
  "rusqlite",
  "serde",
+ "serde_json",
  "tokio",
  "tower-http",
  "url",

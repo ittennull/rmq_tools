@@ -6,8 +6,12 @@
 <SectionContent SectionName="top-bar">
     <MudStack Spacing="5" Row="true">
         <div>
-            <div>@QueueName</div>
-            <div>@_numberOfRemoteMessages messages in RMQ • @(_messages.Count) messages in DB</div>
+            <div><b>@QueueName</b></div>
+            <div>
+                <MudText Inline="true" Color="Color.Info">@_numberOfRemoteMessages</MudText> @MessageWord(_numberOfRemoteMessages) in RMQ
+                 • 
+                <MudText Inline="true" Color="Color.Info">@(_messages.Count)</MudText> @MessageWord(_messages.Count) in DB
+            </div>
         </div>
 
         <div>
@@ -37,10 +41,10 @@
         
         @{
             var howMany = _selectedMessages.Count > 0 ? $"{_selectedMessages.Count}" : "all";
-            var messages = _selectedMessages.Count == 1 ? "message" : "messages";
+            var messages = MessageWord(_selectedMessages.Count);
         }
-        <MudIconButton Icon="@Icons.Material.Filled.Send" Color="Color.Warning" OnClick="SendMessagesToQueue" title="@($"Send {howMany} {messages} to specified queue")"/>
-        <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" Color="Color.Error" OnClick="DeleteMessages" title="@($"Delete {howMany} {messages}")" Disabled="@(_queueId == null)"/>
+        <MudIconButton Icon="@Icons.Material.Filled.Send" Color="Color.Warning" OnClick="SendMessagesToQueue" title="@($"Send {howMany} {messages} to specified queue")" Disabled="@(!CanSendOrDeleteMessages)"/>
+        <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" Color="Color.Error" OnClick="DeleteMessages" title="@($"Delete {howMany} {messages}")" Disabled="@(!CanSendOrDeleteMessages)"/>
     </MudStack>
 </SectionContent>
 
@@ -79,6 +83,8 @@
     string[] _queueNames = [];
     int _numberOfRemoteMessages;
     uint? _queueId;
+
+    public bool CanSendOrDeleteMessages => _queueId != null && _messages.Count != 0;
     
     protected override async Task OnInitializedAsync()
     {
@@ -109,7 +115,9 @@
         try
         {
             using var response = await Http.PostAsync($"/api/queue/load?queue_name={QueueName}", null);
-            _messages = (await response.Content.ReadFromJsonAsync<LoadMessagesByQueueNameResponse>(MySourceGenerationContext.Default.LoadMessagesByQueueNameResponse))!.Messages;
+            var content = (await response.Content.ReadFromJsonAsync<LoadMessagesByQueueNameResponse>(MySourceGenerationContext.Default.LoadMessagesByQueueNameResponse))!;
+            _queueId = content.QueueId;
+            _messages = content.Messages;
             _numberOfRemoteMessages = 0;
         }
         finally
@@ -125,6 +133,8 @@
 
     async Task DeleteMessages()
     {
+        ShowLoadingForOperationOnMessages();
+        
         var body = new DeleteMessagesRequest(_selectedMessages.Select(x => x.Id));
         using var httpRequestMessage = new HttpRequestMessage(HttpMethod.Delete, $"/api/queues/{_queueId}/messages");
         httpRequestMessage.Content = new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(body, MySourceGenerationContext.Default.DeleteMessagesRequest));
@@ -132,6 +142,29 @@
         using var response = await Http.SendAsync(httpRequestMessage);
         response.EnsureSuccessStatusCode();
 
+        ClearMessagesAfterOperation();
+        
+        _loading = false;
+    }
+    
+    async Task SendMessagesToQueue()
+    {
+        ShowLoadingForOperationOnMessages();
+        
+        var body = new SendMessagesRequest(_moveToQueue, _selectedMessages.Select(x => x.Id));
+        using var response = await Http.PostAsJsonAsync($"/api/queues/{_queueId}/messages/send", body, MySourceGenerationContext.Default.SendMessagesRequest);
+        response.EnsureSuccessStatusCode();
+
+        if (_moveToQueue == QueueName)
+            _numberOfRemoteMessages += _selectedMessages.Count == 0 ? _messages.Count : _selectedMessages.Count;
+        
+        ClearMessagesAfterOperation();
+        
+        _loading = false;
+    }
+
+    void ClearMessagesAfterOperation()
+    {
         if (_selectedMessages.Count == 0)
             _messages.Clear();
         else
@@ -139,8 +172,12 @@
         _selectedMessages.Clear();
     }
     
-    async Task SendMessagesToQueue()
+    string MessageWord(int count) => count == 1 ? "message" : "messages";
+
+    void ShowLoadingForOperationOnMessages()
     {
-        
+        const int threshold = 100;
+        if (_selectedMessages.Count > threshold || (_selectedMessages.Count == 0 && _messages.Count > threshold))
+            _loading = true;
     }
 }

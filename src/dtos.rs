@@ -1,5 +1,5 @@
+use crate::database::{MessageId, QueueId};
 use serde::{Deserialize, Serialize};
-use crate::database::QueueId;
 
 #[derive(Serialize, Clone)]
 pub struct RmqConnectionInfo {
@@ -9,7 +9,7 @@ pub struct RmqConnectionInfo {
 
 #[derive(Serialize)]
 pub struct Message {
-    pub id: u64,
+    pub id: MessageId,
     pub payload: String,
 }
 
@@ -20,6 +20,7 @@ pub struct LoadMessagesByQueueNameQuery {
 
 #[derive(Serialize)]
 pub struct LoadMessagesByQueueNameResponse {
+    pub queue_id: QueueId,
     pub messages: Vec<Message>,
 }
 
@@ -34,5 +35,11 @@ pub struct QueueSummary {
 
 #[derive(Deserialize)]
 pub struct DeleteMessagesRequest {
-    pub message_ids: Vec<u64>,
+    pub message_ids: Vec<MessageId>,
+}
+
+#[derive(Deserialize)]
+pub struct SendMessagesRequest {
+    pub message_ids: Vec<MessageId>,
+    pub destination_queue_name: String,
 }

@@ -4,6 +4,7 @@ use anyhow::Result;
 use rusqlite::{Connection, Error, OptionalExtension, ToSql};
 
 pub type QueueId = u64;
+pub type MessageId = u64;
 
 pub struct Database {
     connection: Connection,
@@ -70,7 +71,7 @@ impl Database {
         Ok(result)
     }
 
-    pub fn get_messages(&self, queue_id: QueueId) -> Result<Vec<Message>, DatabaseError> {
+    fn get_messages_in_queue(&self, queue_id: QueueId) -> Result<Vec<Message>, DatabaseError> {
         let mut stmt = self
             .connection
             .prepare("SELECT id, payload FROM messages WHERE queue_id = ?")?;
@@ -81,6 +82,27 @@ impl Database {
             })
         })?;
         Ok(vec.collect::<Result<Vec<_>, _>>()?)
+    }
+
+    fn get_messages_by_ids(&self, ids: &[MessageId]) -> Result<Vec<Message>, DatabaseError> {
+        let vars = repeat_vars(ids.len());
+        let mut stmt = self.connection.prepare(&format!(
+            "SELECT id, payload FROM messages WHERE id IN ({vars})"
+        ))?;
+        let vec = stmt.query_map(rusqlite::params_from_iter(ids), |row| {
+            Ok(Message {
+                id: row.get(0)?,
+                payload: row.get(1)?,
+            })
+        })?;
+        Ok(vec.collect::<Result<Vec<_>, _>>()?)
+    }
+
+    pub fn get_messages(&self, selector: &MessageSelector) -> Result<Vec<Message>, DatabaseError> {
+        match selector {
+            MessageSelector::AllInQueue(queue_id) => self.get_messages_in_queue(*queue_id),
+            MessageSelector::WithIds(ids) => self.get_messages_by_ids(ids),
+        }
     }
 
     pub fn create_queue(&self, name: &str) -> Result<QueueId, DatabaseError> {
@@ -120,7 +142,7 @@ impl Database {
         Ok(())
     }
 
-    pub fn delete_messages(&self, ids: &Vec<u64>) -> Result<(), DatabaseError> {
+    fn delete_messages_by_ids(&self, ids: &[MessageId]) -> Result<(), DatabaseError> {
         let vars = repeat_vars(ids.len());
         self.connection.execute(
             &format!("DELETE FROM messages WHERE id IN ({vars})"),
@@ -129,10 +151,17 @@ impl Database {
         Ok(())
     }
 
-    pub fn delete_all_messages(&self, queue_id: QueueId) -> Result<(), DatabaseError> {
+    fn delete_all_messages(&self, queue_id: QueueId) -> Result<(), DatabaseError> {
         self.connection
             .execute("DELETE FROM messages WHERE queue_id=?", [queue_id])?;
         Ok(())
+    }
+
+    pub fn delete_messages(&self, selector: &MessageSelector) -> Result<(), DatabaseError> {
+        match selector {
+            MessageSelector::AllInQueue(queue_id) => self.delete_all_messages(*queue_id),
+            MessageSelector::WithIds(ids) => self.delete_messages_by_ids(ids),
+        }
     }
 }
 
@@ -142,4 +171,9 @@ fn repeat_vars(count: usize) -> String {
     // Remove trailing comma
     s.pop();
     s
+}
+
+pub enum MessageSelector<'a> {
+    AllInQueue(QueueId),
+    WithIds(&'a [QueueId]),
 }
