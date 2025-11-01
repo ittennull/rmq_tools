@@ -6,11 +6,7 @@
     <MudStack Spacing="5" Row="true">
         <div>
             <div>@QueueName</div>
-            <div>
-                @_numberOfRemoteMessages messages in RMQ
-                 • 
-                @(_messages.Count) messages in DB
-            </div>
+            <div>@_numberOfRemoteMessages messages in RMQ • @(_messages.Count) messages in DB</div>
         </div>
 
         <div>
@@ -32,12 +28,18 @@
         <MudSelect @bind-Value="_moveToQueue" Variant="Variant.Outlined" Label="Send to queue" Margin="Margin.Dense" Dense="true" FitContent="true">
             @foreach (var queueName in _queueNames)
             {
-                <MudSelectItem Value="queueName"/>
+                <MudSelectItem Value="queueName">
+                    @($"{queueName}" + (queueName == QueueName ? " ★" : ""))
+                </MudSelectItem>
             }
         </MudSelect>
         
-        <MudIconButton Icon="@Icons.Material.Filled.Send" Color="Color.Warning" OnClick="SendMessagesToQueue" title="Send messages to specified queue"/>
-        <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" Color="Color.Error" OnClick="DeleteMessages" title="Delete messages"/>
+        @{
+            var howMany = _selectedIds.Count > 0 ? $"{_selectedIds.Count}" : "all";
+            var messages = _selectedIds.Count == 1 ? "message" : "messages";
+        }
+        <MudIconButton Icon="@Icons.Material.Filled.Send" Color="Color.Warning" OnClick="SendMessagesToQueue" title="@($"Send {howMany} {messages} to specified queue")"/>
+        <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" Color="Color.Error" OnClick="DeleteMessages" title="@($"Delete {howMany} {messages}")"/>
     </MudStack>
 </SectionContent>
 
@@ -81,9 +83,13 @@
             .Order()
             .ToArray();
 
-        _numberOfRemoteMessages = queues.SingleOrDefault(x => x.Name == QueueName)?.MessageCountInRmq ?? 0;
-        
-        await LoadMessages();
+        if (queues.SingleOrDefault(x => x.Name == QueueName) is { } requestedQueue)
+        {
+            _numberOfRemoteMessages = requestedQueue.MessageCountInRmq;
+            
+            if (requestedQueue.QueueId != null)
+                _messages = (await Http.GetFromJsonAsync<List<Message>>($"/api/queues/{requestedQueue.QueueId}/messages", MySourceGenerationContext.Default.ListMessage))!;
+        }
     }
 
     async Task LoadMessages()

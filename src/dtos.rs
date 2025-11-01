@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::database::QueueId;
 
 #[derive(Serialize, Clone)]
 pub struct RmqConnectionInfo {
@@ -24,6 +25,7 @@ pub struct LoadMessagesByQueueNameResponse {
 
 #[derive(Serialize)]
 pub struct QueueSummary {
+    pub queue_id: Option<QueueId>,
     pub name: String,
     pub message_count_in_rmq: u64,
     pub message_count_in_db: Option<u64>,

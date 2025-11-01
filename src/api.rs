@@ -76,6 +76,7 @@ async fn list_queues(State(state): State<AppState>) -> Result<Json<Vec<QueueSumm
         .map(|remote_queue| {
             let local_queue = local_queues.iter().find(|q| q.name == remote_queue.name);
             QueueSummary {
+                queue_id: local_queue.map(|x| x.id),
                 name: remote_queue.name,
                 message_count_in_rmq: remote_queue.message_count,
                 message_count_in_db: local_queue.map(|x| x.message_count),
