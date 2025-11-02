@@ -110,7 +110,7 @@ impl Database {
     pub fn save_messages(
         &self,
         queue_id: QueueId,
-        messages: &Vec<(String, Map<String, serde_json::Value>)>,
+        messages: &[(String, Map<String, serde_json::Value>)],
     ) -> Result<(), DatabaseError> {
         let vars = {
             let mut s = "(?,?,?),".repeat(messages.len());

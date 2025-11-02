@@ -24,7 +24,7 @@ pub enum RabbitMQError {
 
 impl Rabbitmq {
     pub fn new(url: &str, vhost: &str) -> Result<Self, anyhow::Error> {
-        let url = Url::parse(&url)?;
+        let url = Url::parse(url)?;
         let domain = url.domain().expect("Domain is missing").to_string();
         let endpoint = format!(
             "{}://{}:{}{}",
@@ -104,7 +104,7 @@ impl Rabbitmq {
     ) -> Result<(), RabbitMQError> {
         let properties = MessageProperties::from_iter(props);
         self.client
-            .publish_message(&self.vhost, "", &to_queue, payload, properties)
+            .publish_message(&self.vhost, "", to_queue, payload, properties)
             .await?;
         Ok(())
     }

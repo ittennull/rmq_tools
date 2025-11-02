@@ -31,7 +31,7 @@ jobs:
 
     - name: Build Wasm
       run: |
-        dotnet workload install wasm-tools
+        dotnet workload install wasm-tools -v detailed
         dotnet publish RmqToolsWeb/RmqToolsWeb/RmqToolsWeb.csproj -c Release --output wasm_out
 
     - name: "Caching cargo & rustup"
@@ -52,7 +52,7 @@ jobs:
     - name: Build
       run: cargo build --release --verbose --target=${{ matrix.job.target }}
 
-    - name: Set binary name & path
+    - name: Create zip file
       id: bin
       shell: bash
       run: |
@@ -62,7 +62,7 @@ jobs:
           *-pc-windows-*) EXE_suffix=".exe" ;;
         esac;
         
-        APP_NAME="clean_rmq"
+        APP_NAME="rmq-tools"
         
         # Setup paths
         mkdir -p out
