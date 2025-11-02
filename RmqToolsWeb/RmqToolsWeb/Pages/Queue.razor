@@ -101,7 +101,7 @@
     int _numberOfRemoteMessages;
     uint? _queueId;
 
-    public bool CanSendOrDeleteMessages => _queueId != null && _messages.Count != 0;
+    bool CanSendOrDeleteMessages => _queueId != null && _messages.Count != 0;
     
     protected override async Task OnInitializedAsync()
     {
