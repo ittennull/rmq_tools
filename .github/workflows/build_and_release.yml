@@ -62,7 +62,7 @@ jobs:
           *-pc-windows-*) EXE_suffix=".exe" ;;
         esac;
         
-        APP_NAME="rmq-tools"
+        APP_NAME="rmq_tools"
         
         # Setup paths
         mkdir -p out
