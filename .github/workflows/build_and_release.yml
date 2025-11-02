@@ -30,7 +30,9 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Build Wasm
-      run: dotnet publish RmqToolsWeb/RmqToolsWeb/RmqToolsWeb.csproj -c Release --output wasm_out
+      run: |
+        dotnet workload install wasm-tools
+        dotnet publish RmqToolsWeb/RmqToolsWeb/RmqToolsWeb.csproj -c Release --output wasm_out
 
     - name: "Caching cargo & rustup"
       uses: actions/cache@v4
