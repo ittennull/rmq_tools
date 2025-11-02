@@ -65,15 +65,16 @@ jobs:
         APP_NAME="rmq_tools"
         
         # Setup paths
-        mkdir -p out
+        OUT_DIR="${{ github.workspace }}/out/$APP_NAME"
+        mkdir -p $OUT_DIR
         BIN_PATH="target/${{ matrix.job.target }}/release/${APP_NAME}${EXE_suffix}"
-        ARTIFACT_PATH="${{ github.workspace }}/out/${APP_NAME}-${{github.ref_name}}-${{ matrix.job.target }}${EXE_suffix}"
+        ARTIFACT_PATH="$OUT_DIR/${APP_NAME}-${{github.ref_name}}-${{ matrix.job.target }}${EXE_suffix}"
         
-        cp $BIN_PATH $ARTIFACT_PATH
-        cp -r wasm_out/wwwroot out/
+        mv $BIN_PATH $ARTIFACT_PATH
+        mv -r wasm_out/wwwroot ${OUT_DIR}/
 
         ARCHIVE_PATH="${{ github.workspace }}/${APP_NAME}-${{github.ref_name}}-${{ matrix.job.target }}.zip"
-        zip -r $ARCHIVE_PATH out
+        zip -r $ARCHIVE_PATH $OUT_DIR/*
         
         # Let subsequent steps know where to find the archive
         echo "ARCHIVE_PATH=${ARCHIVE_PATH}" >> $GITHUB_OUTPUT
