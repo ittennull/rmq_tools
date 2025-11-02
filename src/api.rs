@@ -59,7 +59,7 @@ pub fn build_api(rmq_client: Rabbitmq, database: Database) -> Router {
                 .with_state(state)
                 .layer(cors_layer),
         )
-        .fallback_service(ServeDir::new("static").fallback(ServeFile::new("static/index.html")))
+        .fallback_service(ServeDir::new("wwwroot").fallback(ServeFile::new("wwwroot/index.html")))
 }
 
 async fn get_rmq_connection_info(State(state): State<AppState>) -> Json<RmqConnectionInfo> {
