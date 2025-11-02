@@ -11,6 +11,7 @@ pub struct RmqConnectionInfo {
 pub struct Message {
     pub id: MessageId,
     pub payload: String,
+    pub headers: serde_json::Map<String, serde_json::Value>,
 }
 
 #[derive(Deserialize)]

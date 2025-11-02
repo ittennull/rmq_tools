@@ -50,20 +50,37 @@
 
 <PageTitle>@QueueName</PageTitle>
 
-<MudDataGrid Items="@_messages" Dense="true" Hover="true" Loading="@_loading" Hideable="true" ShowMenuIcon="true"
+<MudDataGrid Items="@_messages" Dense="true" Hover="true" Loading="@_loading" Hideable="true"
              ColumnsPanelReordering="true"
              MultiSelection="true" @bind-SelectedItems="_selectedMessages" SelectOnRowClick="false"
              Filterable="true" FilterMode="DataGridFilterMode.ColumnFilterRow" FilterCaseSensitivity="DataGridFilterCaseSensitivity.CaseInsensitive">
     <Columns>
         <SelectColumn T="Message" Hideable="false" />
-        <PropertyColumn Property="x => x.Payload" Title="Headers">
+        <PropertyColumn Property="x => x.Payload" Title="Message">
             <CellTemplate>
-                <pre>@context.Item.Payload</pre>
-            </CellTemplate>
-        </PropertyColumn>
-        <PropertyColumn Property="x => x.Payload" Title="Payload">
-            <CellTemplate>
-                <pre>@context.Item.Payload</pre>
+                @foreach (var kvp in context.Item.Headers)
+                {
+                    <pre>
+                        @($"{kvp.Key}: ")
+                        @if (kvp.Value.ValueKind == JsonValueKind.Object)
+                        {
+                            <div class="ml-5">
+                                @foreach (var prop in kvp.Value.EnumerateObject())
+                                {
+                                    <div>@($"{prop.Name}: {prop.Value}")</div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            @kvp.Value
+                        }
+                    </pre>
+                }
+                <br/>
+                <MudText Color="Color.Info">
+                    <pre>@context.Item.Payload</pre>
+                </MudText>
             </CellTemplate>
         </PropertyColumn>
     </Columns>

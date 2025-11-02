@@ -1,7 +1,8 @@
 use crate::dtos::Message;
 use crate::types::db_types::LocalQueue;
 use anyhow::Result;
-use rusqlite::{Connection, Error, OptionalExtension, ToSql};
+use rusqlite::{Connection, OptionalExtension, Row, ToSql};
+use serde_json::Map;
 
 pub type QueueId = u64;
 pub type MessageId = u64;
@@ -10,11 +11,20 @@ pub struct Database {
     connection: Connection,
 }
 
-pub struct DatabaseError(pub rusqlite::Error);
+pub enum DatabaseError {
+    Database(rusqlite::Error),
+    Serialization(serde_json::Error),
+}
 
 impl From<rusqlite::Error> for DatabaseError {
-    fn from(value: Error) -> Self {
-        Self(value)
+    fn from(value: rusqlite::Error) -> Self {
+        DatabaseError::Database(value)
+    }
+}
+
+impl From<serde_json::Error> for DatabaseError {
+    fn from(value: serde_json::Error) -> Self {
+        DatabaseError::Serialization(value)
     }
 }
 
@@ -24,20 +34,21 @@ impl Database {
 
         connection.execute(
             "CREATE TABLE IF NOT EXISTS queues (
-            id   INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE
+            id    INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            name  TEXT NOT NULL UNIQUE
         )",
-            (), // empty list of parameters.
+            (),
         )?;
 
         connection.execute(
             "CREATE TABLE IF NOT EXISTS messages (
-            id   INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-            queue_id TEXT NOT NULL,
-            payload TEXT NOT NULL,
+            id        INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            queue_id  TEXT NOT NULL,
+            headers   TEXT NOT NULL,
+            payload   TEXT NOT NULL,
             FOREIGN KEY(queue_id) REFERENCES queues(id)
         )",
-            (), // empty list of parameters.
+            (),
         )?;
 
         Ok(Self { connection })
@@ -74,27 +85,17 @@ impl Database {
     fn get_messages_in_queue(&self, queue_id: QueueId) -> Result<Vec<Message>, DatabaseError> {
         let mut stmt = self
             .connection
-            .prepare("SELECT id, payload FROM messages WHERE queue_id = ?")?;
-        let vec = stmt.query_map([queue_id], |row| {
-            Ok(Message {
-                id: row.get(0)?,
-                payload: row.get(1)?,
-            })
-        })?;
+            .prepare("SELECT id, payload, headers FROM messages WHERE queue_id = ?")?;
+        let vec = stmt.query_map([queue_id], message_from_row)?;
         Ok(vec.collect::<Result<Vec<_>, _>>()?)
     }
 
     fn get_messages_by_ids(&self, ids: &[MessageId]) -> Result<Vec<Message>, DatabaseError> {
         let vars = repeat_vars(ids.len());
         let mut stmt = self.connection.prepare(&format!(
-            "SELECT id, payload FROM messages WHERE id IN ({vars})"
+            "SELECT id, payload, headers FROM messages WHERE id IN ({vars})"
         ))?;
-        let vec = stmt.query_map(rusqlite::params_from_iter(ids), |row| {
-            Ok(Message {
-                id: row.get(0)?,
-                payload: row.get(1)?,
-            })
-        })?;
+        let vec = stmt.query_map(rusqlite::params_from_iter(ids), message_from_row)?;
         Ok(vec.collect::<Result<Vec<_>, _>>()?)
     }
 
@@ -117,26 +118,31 @@ impl Database {
     pub fn save_messages(
         &self,
         queue_id: QueueId,
-        messages: &Vec<String>,
+        messages: &Vec<(String, Map<String, serde_json::Value>)>,
     ) -> Result<(), DatabaseError> {
         let vars = {
-            let mut s = String::new();
-            for i in (1..=2 * messages.len()).step_by(2) {
-                s.push_str(&format!("(?{},?{}),", i, i + 1));
-            }
-            // Remove trailing comma
-            s.pop();
+            let mut s = "(?,?,?),".repeat(messages.len());
+            s.pop(); // Remove trailing comma
             s
         };
 
-        let mut values: Vec<&dyn ToSql> = Vec::with_capacity(2 * messages.len());
-        for message in messages {
+        let converted_messages = messages
+            .iter()
+            .map(|(msg, headers)| {
+                let headers = serde_json::to_string(&headers);
+                headers.map(|h| (msg, h))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mut values: Vec<&dyn ToSql> = Vec::with_capacity(3 * messages.len());
+        for message in &converted_messages {
             values.push(&queue_id);
-            values.push(message);
+            values.push(message.0);
+            values.push(&message.1);
         }
 
         self.connection.execute(
-            &format!("INSERT INTO messages (queue_id, payload) VALUES {vars}"),
+            &format!("INSERT INTO messages (queue_id, payload, headers) VALUES {vars}"),
             &values[..],
         )?;
         Ok(())
@@ -171,6 +177,15 @@ fn repeat_vars(count: usize) -> String {
     // Remove trailing comma
     s.pop();
     s
+}
+
+fn message_from_row(row: &Row) -> Result<Message, rusqlite::Error> {
+    let headers: String = row.get(2)?;
+    Ok(Message {
+        id: row.get(0)?,
+        payload: row.get(1)?,
+        headers: serde_json::from_str(&headers).unwrap(),
+    })
 }
 
 pub enum MessageSelector<'a> {

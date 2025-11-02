@@ -13,7 +13,6 @@ use axum::http::HeaderValue;
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use axum_macros::debug_handler;
-use std::iter;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
@@ -117,13 +116,13 @@ pub async fn send_messages(
     let messages = guarded.database.get_messages(&message_selector)?;
 
     // publish messages
-    for message in messages {
+    for message in messages.into_iter() {
         guarded
             .rabbitmq
             .send_message(
                 &request.destination_queue_name,
                 &message.payload,
-                iter::empty(),
+                message.headers,
             )
             .await?;
     }
@@ -166,7 +165,7 @@ pub async fn load_messages_by_queue_name(
         .load_messages(&query.queue_name)
         .await?
         .into_iter()
-        .map(|x| x.payload)
+        .map(|x| (x.payload, x.properties.0))
         .collect::<Vec<_>>();
 
     if !rmq_messages.is_empty() {
