@@ -5,6 +5,7 @@ use rabbitmq_http_client::api::{Client, HttpClientError};
 use rabbitmq_http_client::requests::shovels::MessageProperties;
 use rabbitmq_http_client::responses::GetMessage;
 use serde_json::Value;
+use thiserror::Error;
 use url::Url;
 
 pub struct Rabbitmq {
@@ -13,16 +14,12 @@ pub struct Rabbitmq {
     vhost: String,
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum RabbitMQError {
-    HttpClientError(HttpClientError),
-    Other(anyhow::Error),
-}
-
-impl From<HttpClientError> for RabbitMQError {
-    fn from(value: HttpClientError) -> Self {
-        RabbitMQError::HttpClientError(value)
-    }
+    #[error("{:?}", .0)]
+    HttpClientError(#[from] HttpClientError),
+    #[error("{:?}", .0)]
+    Other(#[from] anyhow::Error),
 }
 
 impl Rabbitmq {

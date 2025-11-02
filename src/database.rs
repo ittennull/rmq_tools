@@ -3,6 +3,7 @@ use crate::types::db_types::LocalQueue;
 use anyhow::Result;
 use rusqlite::{Connection, OptionalExtension, Row, ToSql};
 use serde_json::Map;
+use thiserror::Error;
 
 pub type QueueId = u64;
 pub type MessageId = u64;
@@ -11,21 +12,12 @@ pub struct Database {
     connection: Connection,
 }
 
+#[derive(Error, Debug)]
 pub enum DatabaseError {
-    Database(rusqlite::Error),
-    Serialization(serde_json::Error),
-}
-
-impl From<rusqlite::Error> for DatabaseError {
-    fn from(value: rusqlite::Error) -> Self {
-        DatabaseError::Database(value)
-    }
-}
-
-impl From<serde_json::Error> for DatabaseError {
-    fn from(value: serde_json::Error) -> Self {
-        DatabaseError::Serialization(value)
-    }
+    #[error("{:?}", .0)]
+    Database(#[from] rusqlite::Error),
+    #[error("{:?}", .0)]
+    Serialization(#[from] serde_json::Error),
 }
 
 impl Database {
