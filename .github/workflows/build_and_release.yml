@@ -74,7 +74,8 @@ jobs:
         mv wasm_out/wwwroot ${OUT_DIR}/
 
         ARCHIVE_PATH="${{ github.workspace }}/${APP_NAME}-${{github.ref_name}}-${{ matrix.job.target }}.zip"
-        zip -r $ARCHIVE_PATH $OUT_DIR/*
+        cd $OUT_DIR
+        zip -r $ARCHIVE_PATH *
         
         # Let subsequent steps know where to find the archive
         echo "ARCHIVE_PATH=${ARCHIVE_PATH}" >> $GITHUB_OUTPUT
