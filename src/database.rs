@@ -10,6 +10,7 @@ pub type MessageId = u64;
 
 pub struct Database {
     connection: Connection,
+    vhost: String,
 }
 
 #[derive(Error, Debug)]
@@ -21,14 +22,21 @@ pub enum DatabaseError {
 }
 
 impl Database {
-    pub fn new(filename: &str) -> Result<Database> {
+    pub fn new(filename: &str, vhost: &str) -> Result<Database> {
         let connection = Connection::open(format!("{}.db", filename))?;
 
         connection.execute(
             "CREATE TABLE IF NOT EXISTS queues (
             id    INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-            name  TEXT NOT NULL UNIQUE
+            name  TEXT NOT NULL,
+            vhost TEXT NOT NULL
         )",
+            (),
+        )?;
+
+        connection.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_queue_name_vhost
+            ON queues(name, vhost)",
             (),
         )?;
 
@@ -43,7 +51,16 @@ impl Database {
             (),
         )?;
 
-        Ok(Self { connection })
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_queue_id
+            ON messages(queue_id)",
+            (),
+        )?;
+
+        Ok(Self {
+            connection,
+            vhost: vhost.to_string(),
+        })
     }
 
     pub fn get_queues(&self) -> Result<Vec<LocalQueue>, DatabaseError> {
@@ -54,9 +71,10 @@ impl Database {
                 SELECT queue_id, count(*) as count FROM messages
                 GROUP BY queue_id
                 ) m ON m.queue_id = q.id
+            WHERE q.vhost=?
         "#,
         )?;
-        let vec = stmt.query_map([], |row| {
+        let vec = stmt.query_map([&self.vhost], |row| {
             Ok(LocalQueue {
                 id: row.get(0)?,
                 name: row.get(1)?,
@@ -69,8 +87,10 @@ impl Database {
     pub fn find_queue_by_name(&self, name: &str) -> Result<Option<QueueId>, DatabaseError> {
         let mut stmt = self
             .connection
-            .prepare("SELECT id FROM queues WHERE name=?")?;
-        let result = stmt.query_one([name], |row| row.get(0)).optional()?;
+            .prepare("SELECT id FROM queues WHERE name=? AND vhost=?")?;
+        let result = stmt
+            .query_one([name, &self.vhost], |row| row.get(0))
+            .optional()?;
         Ok(result)
     }
 
@@ -99,8 +119,10 @@ impl Database {
     }
 
     pub fn create_queue(&self, name: &str) -> Result<QueueId, DatabaseError> {
-        self.connection
-            .execute("INSERT INTO queues (name) VALUES (?)", [name])?;
+        self.connection.execute(
+            "INSERT INTO queues (name, vhost) VALUES (?, ?)",
+            [name, &self.vhost],
+        )?;
         let queue_id = self
             .find_queue_by_name(name)?
             .expect("Queue ID does not exist, but it was just created");
