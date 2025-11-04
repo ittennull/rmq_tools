@@ -1,5 +1,7 @@
 ﻿@page "/{queueName}"
+@using System.Text
 @using System.Text.Json
+@using System.Text.RegularExpressions
 @using MySourceGenerationContext = RmqToolsWeb.MySourceGenerationContext
 @inject HttpClient Http
 
@@ -50,13 +52,18 @@
 
 <PageTitle>@QueueName</PageTitle>
 
-<MudStack Row="true" Spacing="0" Class="mb-2">
+<MudStack Row="true" Spacing="0" Class="my-2">
     <MudText Class="d-flex align-center">Show message</MudText>
     <MudRadioGroup @bind-Value="_showMessageParts">
         <MudRadio Value="@ShowMessageParts.Headers">headers</MudRadio>
         <MudRadio Value="@ShowMessageParts.Payload">payload</MudRadio>
         <MudRadio Value="@ShowMessageParts.Both">both</MudRadio>
     </MudRadioGroup>
+    
+    <MudSpacer/>
+    
+    <MudTextField Value="_lineFilter" Label="Line filter" Variant="Variant.Text" ValueChanged="@((string s) => SetLineFilter(s))" />
+    
 </MudStack>
 
 <MudDataGrid Items="@_messages" Dense="true" Hover="true" Loading="@_loading" Hideable="true"
@@ -66,50 +73,54 @@
     <Columns>
         <SelectColumn T="MessageItem" Hideable="false" />
         <PropertyColumn Property="x => x.Index" Title="#" Sortable="true" Filterable="false" />
-        <PropertyColumn Property="x => x.Message.Payload" Title="Message">
+        <PropertyColumn Property="x => x.CombinedString" Title="Message">
             <CellTemplate>
                 @if (_showMessageParts is ShowMessageParts.Headers or ShowMessageParts.Both)
                 {
                     @foreach (var kvp in context.Item.Message.Headers)
                     {
                         <pre>
-                            @($"{kvp.Key}: ")
+                            @GetFilteredLine($"{kvp.Key}: ")
                             @if (kvp.Value.ValueKind == JsonValueKind.Object)
                             {
                                 <div class="ml-5">
                                     @foreach (var prop in kvp.Value.EnumerateObject())
                                     {
-                                        <div>@($"{prop.Name}: {prop.Value}")</div>
+                                        <div>@GetFilteredLine($"{prop.Name}: {prop.Value}")</div>
                                     }
                                 </div>
                             }
                             else
                             {
-                                @kvp.Value
+                                @GetFilteredLine(kvp.Value.ToString())
                             }
                         </pre>
                     }
-                    <br/>
+                    
+                    @if (_showMessageParts is ShowMessageParts.Both)
+                    {
+                        <br/>
+                    }
                 }
                 
                 @if (_showMessageParts is ShowMessageParts.Payload or ShowMessageParts.Both)
                 {
                     <MudText Color="Color.Info">
-                        <pre>@context.Item.Message.Payload</pre>
+                        <pre>@GetFilteredLine(context.Item.Message.Payload)</pre>
                     </MudText>
                 }
             </CellTemplate>
         </PropertyColumn>
     </Columns>
     <PagerContent>
-        <MudDataGridPager T="Message" PageSizeOptions="@([100, 1000, 10000])" />
+        <MudDataGridPager T="MessageItem" PageSizeOptions="@([100, 1000, 10000])" />
     </PagerContent>
 </MudDataGrid>
 
 @code {
     enum ShowMessageParts { Both, Headers, Payload }
     
-    record MessageItem(int Index, Message Message);
+    record MessageItem(int Index, Message Message, string CombinedString);
     
     [Parameter]
     public required string QueueName { get; set; }
@@ -122,6 +133,8 @@
     int _numberOfRemoteMessages;
     uint? _queueId;
     ShowMessageParts _showMessageParts = ShowMessageParts.Both;
+    string _lineFilter = "";
+    Regex? _lineFilterRegex;
 
     bool CanSendOrDeleteMessages => _queueId != null && _messages.Count != 0;
     
@@ -224,6 +237,50 @@
     void CreateMessageItems(IEnumerable<Message> messages)
     {
         _messages.Clear();
-        _messages.AddRange(messages.Index().Select(x => new MessageItem(x.Index + 1, x.Item)));
+        _messages.AddRange(messages
+            .Index()
+            .Select(x => new MessageItem(x.Index + 1, x.Item, GetCombinedString(x.Item)))
+            .OrderBy(x => x.Index));
+    }
+
+    string GetCombinedString(Message message)
+    {
+        var sb = new StringBuilder();
+        
+        foreach (var kvp in message.Headers)
+        {
+            sb.Append(kvp.Key);
+            if (kvp.Value.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var prop in kvp.Value.EnumerateObject())
+                {
+                    sb.Append(prop.Name);
+                    sb.Append(prop.Value);
+                }
+            }
+            else
+            {
+                sb.Append(kvp.Value);
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    void SetLineFilter(string s)
+    {
+        _lineFilter = s;
+        _lineFilterRegex = string.IsNullOrEmpty(s) ? null : new Regex($"^.*{s}.*$", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    }
+
+    string GetFilteredLine(string line)
+    {
+        if (_lineFilterRegex is { } regex)
+        {
+            var match = regex.Match(line);
+            return match.Value;
+        }
+
+        return line;
     }
 }
