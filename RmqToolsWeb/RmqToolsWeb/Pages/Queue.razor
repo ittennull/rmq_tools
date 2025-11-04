@@ -1,6 +1,6 @@
 ﻿@page "/{queueName}"
 @using System.Text.Json
-@using RmqToolsWeb.Dtos
+@using MySourceGenerationContext = RmqToolsWeb.MySourceGenerationContext
 @inject HttpClient Http
 
 <SectionContent SectionName="top-bar">
@@ -55,10 +55,11 @@
              MultiSelection="true" @bind-SelectedItems="_selectedMessages" SelectOnRowClick="false"
              Filterable="true" FilterMode="DataGridFilterMode.ColumnFilterRow" FilterCaseSensitivity="DataGridFilterCaseSensitivity.CaseInsensitive">
     <Columns>
-        <SelectColumn T="Message" Hideable="false" />
-        <PropertyColumn Property="x => x.Payload" Title="Message">
+        <SelectColumn T="MessageItem" Hideable="false" />
+        <PropertyColumn Property="x => x.Index" Title="#" Sortable="true" Filterable="false" />
+        <PropertyColumn Property="x => x.Message.Payload" Title="Message">
             <CellTemplate>
-                @foreach (var kvp in context.Item.Headers)
+                @foreach (var kvp in context.Item.Message.Headers)
                 {
                     <pre>
                         @($"{kvp.Key}: ")
@@ -79,7 +80,7 @@
                 }
                 <br/>
                 <MudText Color="Color.Info">
-                    <pre>@context.Item.Payload</pre>
+                    <pre>@context.Item.Message.Payload</pre>
                 </MudText>
             </CellTemplate>
         </PropertyColumn>
@@ -90,12 +91,14 @@
 </MudDataGrid>
 
 @code {
+    record MessageItem(int Index, Message Message);
+    
     [Parameter]
     public required string QueueName { get; set; }
 
-    List<Message> _messages = [];
     bool _loading;
-    HashSet<Message> _selectedMessages = [];
+    List<MessageItem> _messages = [];
+    HashSet<MessageItem> _selectedMessages = [];
     string _moveToQueue = "";
     string[] _queueNames = [];
     int _numberOfRemoteMessages;
@@ -121,7 +124,8 @@
             if (requestedQueue.QueueId != null)
             {
                 _queueId = requestedQueue.QueueId;
-                _messages = (await Http.GetFromJsonAsync<List<Message>>($"/api/queues/{_queueId}/messages", MySourceGenerationContext.Default.ListMessage))!;
+                var messages = (await Http.GetFromJsonAsync<List<Message>>($"/api/queues/{_queueId}/messages", MySourceGenerationContext.Default.ListMessage))!;
+                CreateMessageItems(messages);
             }
         }
     }
@@ -134,7 +138,7 @@
             using var response = await Http.PostAsync($"/api/queue/load?queue_name={QueueName}", null);
             var content = (await response.Content.ReadFromJsonAsync<LoadMessagesByQueueNameResponse>(MySourceGenerationContext.Default.LoadMessagesByQueueNameResponse))!;
             _queueId = content.QueueId;
-            _messages = content.Messages;
+            CreateMessageItems(content.Messages);
             _numberOfRemoteMessages = 0;
         }
         finally
@@ -152,7 +156,7 @@
     {
         ShowLoadingForOperationOnMessages();
         
-        var body = new DeleteMessagesRequest(_selectedMessages.Select(x => x.Id));
+        var body = new DeleteMessagesRequest(_selectedMessages.Select(x => x.Message.Id));
         using var httpRequestMessage = new HttpRequestMessage(HttpMethod.Delete, $"/api/queues/{_queueId}/messages");
         httpRequestMessage.Content = new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(body, MySourceGenerationContext.Default.DeleteMessagesRequest));
         httpRequestMessage.Content.Headers.ContentType = new("application/json");
@@ -168,7 +172,7 @@
     {
         ShowLoadingForOperationOnMessages();
         
-        var body = new SendMessagesRequest(_moveToQueue, _selectedMessages.Select(x => x.Id));
+        var body = new SendMessagesRequest(_moveToQueue, _selectedMessages.Select(x => x.Message.Id));
         using var response = await Http.PostAsJsonAsync($"/api/queues/{_queueId}/messages/send", body, MySourceGenerationContext.Default.SendMessagesRequest);
         response.EnsureSuccessStatusCode();
 
@@ -196,5 +200,11 @@
         const int threshold = 100;
         if (_selectedMessages.Count > threshold || (_selectedMessages.Count == 0 && _messages.Count > threshold))
             _loading = true;
+    }
+
+    void CreateMessageItems(IEnumerable<Message> messages)
+    {
+        _messages.Clear();
+        _messages.AddRange(messages.Index().Select(x => new MessageItem(x.Index + 1, x.Item)));
     }
 }

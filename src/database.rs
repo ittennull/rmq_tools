@@ -21,8 +21,8 @@ pub enum DatabaseError {
 }
 
 impl Database {
-    pub fn new() -> Result<Database> {
-        let connection = Connection::open("rmq_tools.db")?;
+    pub fn new(filename: &str) -> Result<Database> {
+        let connection = Connection::open(format!("{}.db", filename))?;
 
         connection.execute(
             "CREATE TABLE IF NOT EXISTS queues (

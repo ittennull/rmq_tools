@@ -15,7 +15,8 @@ use clap::Parser;
 async fn main() -> Result<()> {
     let args = Args::parse();
     let rmq_client = Rabbitmq::new(&args.url, &args.vhost)?;
-    let database = Database::new()?;
+    let connection_info = rmq_client.get_connection_info();
+    let database = Database::new(&connection_info.domain)?;
 
     let app = api::build_api(rmq_client, database);
 
