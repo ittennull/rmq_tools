@@ -50,8 +50,17 @@
 
 <PageTitle>@QueueName</PageTitle>
 
+<MudStack Row="true" Spacing="0" Class="mb-2">
+    <MudText Class="d-flex align-center">Show message</MudText>
+    <MudRadioGroup @bind-Value="_showMessageParts">
+        <MudRadio Value="@ShowMessageParts.Headers">headers</MudRadio>
+        <MudRadio Value="@ShowMessageParts.Payload">payload</MudRadio>
+        <MudRadio Value="@ShowMessageParts.Both">both</MudRadio>
+    </MudRadioGroup>
+</MudStack>
+
 <MudDataGrid Items="@_messages" Dense="true" Hover="true" Loading="@_loading" Hideable="true"
-             ColumnsPanelReordering="true"
+             ColumnsPanelReordering="true" Elevation="5"
              MultiSelection="true" @bind-SelectedItems="_selectedMessages" SelectOnRowClick="false"
              Filterable="true" FilterMode="DataGridFilterMode.ColumnFilterRow" FilterCaseSensitivity="DataGridFilterCaseSensitivity.CaseInsensitive">
     <Columns>
@@ -59,29 +68,36 @@
         <PropertyColumn Property="x => x.Index" Title="#" Sortable="true" Filterable="false" />
         <PropertyColumn Property="x => x.Message.Payload" Title="Message">
             <CellTemplate>
-                @foreach (var kvp in context.Item.Message.Headers)
+                @if (_showMessageParts is ShowMessageParts.Headers or ShowMessageParts.Both)
                 {
-                    <pre>
-                        @($"{kvp.Key}: ")
-                        @if (kvp.Value.ValueKind == JsonValueKind.Object)
-                        {
-                            <div class="ml-5">
-                                @foreach (var prop in kvp.Value.EnumerateObject())
-                                {
-                                    <div>@($"{prop.Name}: {prop.Value}")</div>
-                                }
-                            </div>
-                        }
-                        else
-                        {
-                            @kvp.Value
-                        }
-                    </pre>
+                    @foreach (var kvp in context.Item.Message.Headers)
+                    {
+                        <pre>
+                            @($"{kvp.Key}: ")
+                            @if (kvp.Value.ValueKind == JsonValueKind.Object)
+                            {
+                                <div class="ml-5">
+                                    @foreach (var prop in kvp.Value.EnumerateObject())
+                                    {
+                                        <div>@($"{prop.Name}: {prop.Value}")</div>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                @kvp.Value
+                            }
+                        </pre>
+                    }
+                    <br/>
                 }
-                <br/>
-                <MudText Color="Color.Info">
-                    <pre>@context.Item.Message.Payload</pre>
-                </MudText>
+                
+                @if (_showMessageParts is ShowMessageParts.Payload or ShowMessageParts.Both)
+                {
+                    <MudText Color="Color.Info">
+                        <pre>@context.Item.Message.Payload</pre>
+                    </MudText>
+                }
             </CellTemplate>
         </PropertyColumn>
     </Columns>
@@ -91,6 +107,8 @@
 </MudDataGrid>
 
 @code {
+    enum ShowMessageParts { Both, Headers, Payload }
+    
     record MessageItem(int Index, Message Message);
     
     [Parameter]
@@ -103,6 +121,7 @@
     string[] _queueNames = [];
     int _numberOfRemoteMessages;
     uint? _queueId;
+    ShowMessageParts _showMessageParts = ShowMessageParts.Both;
 
     bool CanSendOrDeleteMessages => _queueId != null && _messages.Count != 0;
     
