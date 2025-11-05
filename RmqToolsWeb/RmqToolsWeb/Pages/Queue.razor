@@ -1,7 +1,6 @@
 ﻿@page "/{queueName}"
 @using System.Text
 @using System.Text.Json
-@using System.Text.RegularExpressions
 @using MySourceGenerationContext = RmqToolsWeb.MySourceGenerationContext
 @inject HttpClient Http
 
@@ -62,7 +61,7 @@
     
     <MudSpacer/>
     
-    <MudTextField Value="_lineFilter" Label="Line filter" Variant="Variant.Text" ValueChanged="@((string s) => SetLineFilter(s))" />
+    <MudTextField Value="_lineFilter" Label="Line filter" Variant="Variant.Text" ValueChanged="@((string s) => SetLineFilter(s))" Clearable="true"  />
     
 </MudStack>
 
@@ -72,29 +71,34 @@
              Filterable="true" FilterMode="DataGridFilterMode.ColumnFilterRow" FilterCaseSensitivity="DataGridFilterCaseSensitivity.CaseInsensitive">
     <Columns>
         <SelectColumn T="MessageItem" Hideable="false" />
-        <PropertyColumn Property="x => x.Index" Title="#" Sortable="true" Filterable="false" />
+        <PropertyColumn Property="x => x.Index" Title="#" Sortable="true" Filterable="false" CellStyle="user-select: none;" />
         <PropertyColumn Property="x => x.CombinedString" Title="Message">
             <CellTemplate>
                 @if (_showMessageParts is ShowMessageParts.Headers or ShowMessageParts.Both)
                 {
                     @foreach (var kvp in context.Item.Message.Headers)
                     {
-                        <pre>
-                            @GetFilteredLine($"{kvp.Key}: ")
-                            @if (kvp.Value.ValueKind == JsonValueKind.Object)
-                            {
+                        if (kvp.Value.ValueKind == JsonValueKind.Object)
+                        {
+                                <MudHighlighter Text="@GetFilteredLines($"{kvp.Key}: ").FirstOrDefault()" HighlightedText="@_lineFilter" CaseSensitive="false" />
                                 <div class="ml-5">
                                     @foreach (var prop in kvp.Value.EnumerateObject())
                                     {
-                                        <div>@GetFilteredLine($"{prop.Name}: {prop.Value}")</div>
+                                        foreach (var line in GetFilteredLines($"{prop.Name}: {prop.Value.ToString()}"))
+                                        {
+                                            <div style="white-space: pre-wrap;">
+                                                <MudHighlighter Text="@line" HighlightedText="@_lineFilter" CaseSensitive="false" />
+                                            </div>
+                                        }
                                     }
                                 </div>
-                            }
-                            else
-                            {
-                                @GetFilteredLine(kvp.Value.ToString())
-                            }
-                        </pre>
+                        }
+                        else
+                        {
+                            <div>
+                                <MudHighlighter Text="@GetFilteredLines($"{kvp.Key}: {kvp.Value}").FirstOrDefault()" HighlightedText="@_lineFilter" CaseSensitive="false" />
+                            </div>
+                        }
                     }
                     
                     @if (_showMessageParts is ShowMessageParts.Both)
@@ -106,7 +110,12 @@
                 @if (_showMessageParts is ShowMessageParts.Payload or ShowMessageParts.Both)
                 {
                     <MudText Color="Color.Info">
-                        <pre>@GetFilteredLine(context.Item.Message.Payload)</pre>
+                        <pre>
+                            @foreach (var line in GetFilteredLines(context.Item.Message.Payload))
+                            {
+                                <MudHighlighter Text="@line" HighlightedText="@_lineFilter" CaseSensitive="false" />
+                            }
+                        </pre>
                     </MudText>
                 }
             </CellTemplate>
@@ -134,7 +143,6 @@
     uint? _queueId;
     ShowMessageParts _showMessageParts = ShowMessageParts.Both;
     string _lineFilter = "";
-    Regex? _lineFilterRegex;
 
     bool CanSendOrDeleteMessages => _queueId != null && _messages.Count != 0;
     
@@ -264,23 +272,55 @@
             }
         }
 
+        sb.Append(message.Payload);
+
         return sb.ToString();
     }
 
     void SetLineFilter(string s)
     {
         _lineFilter = s;
-        _lineFilterRegex = string.IsNullOrEmpty(s) ? null : new Regex($"^.*{s}.*$", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.Compiled);
     }
 
-    string GetFilteredLine(string line)
+    IEnumerable<string> GetFilteredLines(string line)
     {
-        if (_lineFilterRegex is { } regex)
+        if (_lineFilter == string.Empty)
         {
-            var match = regex.Match(line);
-            return match.Value;
+            yield return line;
+            yield break;
         }
 
-        return line;
+        int index = 0;
+        while (true)
+        {
+            var (wholeLine, endIndex) = FindString(line, index);
+            if (wholeLine != null)
+                yield return wholeLine;
+            
+            if (wholeLine == null || endIndex == line.Length)
+                yield break;
+            
+            index = endIndex;
+        }
+    }
+
+    (string? wholeLine, int endIndex) FindString(string line, int lineStartIndex)
+    {
+        if (line.Length == 0)
+            return default;
+        
+        var index = line.IndexOf(_lineFilter, lineStartIndex, StringComparison.InvariantCultureIgnoreCase);
+        if (index == -1)
+            return default;
+        
+        // find a start of the string
+        var startIndex = line.LastIndexOf('\n', index);
+        startIndex += 1;
+        
+        // find an end of the string
+        var endIndex = line.IndexOf('\n', index + _lineFilter.Length);
+        endIndex = endIndex == -1 ? line.Length : endIndex + 1;
+
+        return (line[startIndex .. endIndex], endIndex);
     }
 }
