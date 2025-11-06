@@ -97,7 +97,7 @@ impl Database {
     fn get_messages_in_queue(&self, queue_id: QueueId) -> Result<Vec<Message>, DatabaseError> {
         let mut stmt = self
             .connection
-            .prepare("SELECT id, payload, headers FROM messages WHERE queue_id = ?")?;
+            .prepare("SELECT id, payload, headers FROM messages WHERE queue_id = ? ORDER BY id")?;
         let vec = stmt.query_map([queue_id], message_from_row)?;
         Ok(vec.collect::<Result<Vec<_>, _>>()?)
     }
@@ -105,7 +105,7 @@ impl Database {
     fn get_messages_by_ids(&self, ids: &[MessageId]) -> Result<Vec<Message>, DatabaseError> {
         let vars = repeat_vars(ids.len());
         let mut stmt = self.connection.prepare(&format!(
-            "SELECT id, payload, headers FROM messages WHERE id IN ({vars})"
+            "SELECT id, payload, headers FROM messages WHERE id IN ({vars}) ORDER BY id"
         ))?;
         let vec = stmt.query_map(rusqlite::params_from_iter(ids), message_from_row)?;
         Ok(vec.collect::<Result<Vec<_>, _>>()?)
