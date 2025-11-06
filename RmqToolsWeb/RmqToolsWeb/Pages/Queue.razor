@@ -1,8 +1,10 @@
 ﻿@page "/{queueName}"
 @using System.Text
 @using System.Text.Json
+@using RmqToolsWeb.Components
 @using MySourceGenerationContext = RmqToolsWeb.MySourceGenerationContext
 @inject HttpClient Http
+@inject IDialogService DialogService
 
 <SectionContent SectionName="top-bar">
     <MudStack Spacing="5" Row="true">
@@ -29,7 +31,7 @@
             <MudText Class="align-content-center" Color="Color.Info">@($"{_selectedMessages.Count} selected")</MudText>
         }
             
-        <MudSelect @bind-Value="_moveToQueue" Variant="Variant.Outlined" Label="Send to queue" Margin="Margin.Dense" Dense="true" FullWidth="true" FitContent="false">
+        <MudSelect @bind-Value="_moveToQueue" Variant="Variant.Outlined" Label="Send to queue" Margin="Margin.Dense" Dense="true" FullWidth="true" FitContent="true">
             @foreach (var queueName in _queueNames)
             {
                 <MudSelectItem Value="queueName">
@@ -37,7 +39,7 @@
                 </MudSelectItem>
             }
         </MudSelect>
-
+        
         @{
             var howMany = _selectedMessages.Count > 0 ? $"{_selectedMessages.Count}" : "all";
             var messages = MessageWord(_selectedMessages.Count);
@@ -60,7 +62,8 @@
     <MudSpacer/>
     
     <MudTextField Value="_lineFilter" Label="Line filter" Variant="Variant.Text" ValueChanged="@((string s) => SetLineFilter(s))" Clearable="true"  />
-    
+    <MudIconButton Icon="@Icons.Material.Filled.LibraryBooks" Color="Color.Inherit" Size="Size.Medium" Edge="Edge.Start" OnClick="ExportFilteredLines"
+                   Disabled="@(_lineFilter == string.Empty)" title="Export filtered lines" Class="ml-1" />
 </MudStack>
 
 <MudDataGrid Items="@_messages" Dense="true" Hover="true" Loading="@_loading" Hideable="true"
@@ -320,5 +323,53 @@
         endIndex = endIndex == -1 ? line.Length : endIndex + 1;
 
         return (line[startIndex .. endIndex], endIndex);
+    }
+
+    async Task ExportFilteredLines()
+    {
+        var sb = new StringBuilder();
+
+        foreach (var messageItem in _messages)
+        {
+            if (_showMessageParts is ShowMessageParts.Headers or ShowMessageParts.Both)
+            {
+                foreach (var kvp in messageItem.Message.Headers)
+                {
+                    if (kvp.Value.ValueKind == JsonValueKind.Object)
+                    {
+                        if (GetFilteredLines($"{kvp.Key}: ").FirstOrDefault() is { } line1)
+                            sb.AppendLine(line1.Trim());
+                        
+                        foreach (var prop in kvp.Value.EnumerateObject())
+                        {
+                            foreach (var line2 in GetFilteredLines($"{prop.Name}: {prop.Value.ToString()}"))
+                            {
+                                sb.AppendLine(line2.Trim());
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (GetFilteredLines($"{kvp.Key}: {kvp.Value}").FirstOrDefault() is { } line)
+                            sb.AppendLine(line.Trim());
+                    }
+                }
+            }
+        
+            if (_showMessageParts is ShowMessageParts.Payload or ShowMessageParts.Both)
+            {
+                foreach (var line in GetFilteredLines(messageItem.Message.Payload))
+                {
+                    sb.AppendLine(line.Trim());
+                }
+            }
+        }
+        
+        var parameters = new DialogParameters<ExportFilteredLinesDialog>
+        {
+            { x => x.Lines, sb.ToString() },
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Large };
+        await DialogService.ShowAsync<ExportFilteredLinesDialog>("Filtered lines", parameters, options);
     }
 }

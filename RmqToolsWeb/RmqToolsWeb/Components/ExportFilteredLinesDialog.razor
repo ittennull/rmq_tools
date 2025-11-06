@@ -1,0 +1,19 @@
+@inject IJSRuntime jsInterop
+
+<MudDialog>
+    <DialogContent>
+        <pre>@Lines</pre>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" Variant="Variant.Outlined" OnClick="Copy">Copy to clipboard</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public string Lines { get; set; }
+
+    private async Task Copy()
+    {
+        await jsInterop.InvokeVoidAsync("navigator.clipboard.writeText", Lines);
+    }
+}
