@@ -28,10 +28,8 @@
             <MudIconButton Icon="@Icons.Material.Filled.Close" Color="Color.Inherit" OnClick="UnselectAll" title="Unselect all"/>
             <MudText Class="align-content-center" Color="Color.Info">@($"{_selectedMessages.Count} selected")</MudText>
         }
-    </MudStack>
-    
-    <MudStack Spacing="1" Row="true" Class="ml-5">
-        <MudSelect @bind-Value="_moveToQueue" Variant="Variant.Outlined" Label="Send to queue" Margin="Margin.Dense" Dense="true" FitContent="true">
+            
+        <MudSelect @bind-Value="_moveToQueue" Variant="Variant.Outlined" Label="Send to queue" Margin="Margin.Dense" Dense="true" FullWidth="true" FitContent="false">
             @foreach (var queueName in _queueNames)
             {
                 <MudSelectItem Value="queueName">
@@ -39,7 +37,7 @@
                 </MudSelectItem>
             }
         </MudSelect>
-        
+
         @{
             var howMany = _selectedMessages.Count > 0 ? $"{_selectedMessages.Count}" : "all";
             var messages = MessageWord(_selectedMessages.Count);
@@ -51,7 +49,7 @@
 
 <PageTitle>@QueueName</PageTitle>
 
-<MudStack Row="true" Spacing="0" Class="my-2">
+<MudStack Row="true" Spacing="0" Class="ma-2">
     <MudText Class="d-flex align-center">Show message</MudText>
     <MudRadioGroup @bind-Value="_showMessageParts">
         <MudRadio Value="@ShowMessageParts.Headers">headers</MudRadio>
@@ -66,7 +64,7 @@
 </MudStack>
 
 <MudDataGrid Items="@_messages" Dense="true" Hover="true" Loading="@_loading" Hideable="true"
-             ColumnsPanelReordering="true" Elevation="5"
+             ColumnsPanelReordering="true" Elevation="5" Class="overflow-auto"
              MultiSelection="true" @bind-SelectedItems="_selectedMessages" SelectOnRowClick="false"
              Filterable="true" FilterMode="DataGridFilterMode.ColumnFilterRow" FilterCaseSensitivity="DataGridFilterCaseSensitivity.CaseInsensitive">
     <Columns>
@@ -80,18 +78,18 @@
                     {
                         if (kvp.Value.ValueKind == JsonValueKind.Object)
                         {
-                                <MudHighlighter Text="@GetFilteredLines($"{kvp.Key}: ").FirstOrDefault()" HighlightedText="@_lineFilter" CaseSensitive="false" />
-                                <div class="ml-5">
-                                    @foreach (var prop in kvp.Value.EnumerateObject())
+                            <MudHighlighter Text="@GetFilteredLines($"{kvp.Key}: ").FirstOrDefault()" HighlightedText="@_lineFilter" CaseSensitive="false" />
+                            <div class="ml-5">
+                                @foreach (var prop in kvp.Value.EnumerateObject())
+                                {
+                                    foreach (var line in GetFilteredLines($"{prop.Name}: {prop.Value.ToString()}"))
                                     {
-                                        foreach (var line in GetFilteredLines($"{prop.Name}: {prop.Value.ToString()}"))
-                                        {
-                                            <div style="white-space: pre-wrap;">
-                                                <MudHighlighter Text="@line" HighlightedText="@_lineFilter" CaseSensitive="false" />
-                                            </div>
-                                        }
+                                        <div style="white-space: pre-wrap;">
+                                            <MudHighlighter Text="@line" HighlightedText="@_lineFilter" CaseSensitive="false" />
+                                        </div>
                                     }
-                                </div>
+                                }
+                            </div>
                         }
                         else
                         {
