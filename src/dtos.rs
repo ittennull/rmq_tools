@@ -19,6 +19,11 @@ pub struct LoadMessagesByQueueNameQuery {
     pub queue_name: String,
 }
 
+#[derive(Deserialize)]
+pub struct PeekMessagesQuery {
+    pub queue_name: String,
+}
+
 #[derive(Serialize)]
 pub struct LoadMessagesByQueueNameResponse {
     pub queue_id: QueueId,

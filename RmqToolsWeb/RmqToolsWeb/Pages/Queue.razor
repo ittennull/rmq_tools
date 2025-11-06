@@ -8,7 +8,7 @@
             <div>
                 <MudText Inline="true" Color="Color.Info">@_numberOfRemoteMessages</MudText> @MessageWord(_numberOfRemoteMessages) in RMQ
                  • 
-                <MudText Inline="true" Color="Color.Info">@(_messages.Count)</MudText> @MessageWord(_messages.Count) in DB
+                <MudText Inline="true" Color="Color.Info">@(_numberOfMessagesInDb)</MudText> @MessageWord(_numberOfMessagesInDb) in DB
             </div>
         </div>
 
@@ -17,29 +17,36 @@
     
     <MudSpacer />
     
-    <MudStack Spacing="1" Row="true">
-        @if (_selectedMessages.Count > 0)
-        {
-            <MudIconButton Icon="@Icons.Material.Filled.Close" Color="Color.Inherit" OnClick="UnselectAll" title="Unselect all"/>
-            <MudText Class="align-content-center" Style="white-space: nowrap;" Color="Color.Info">@($"{_selectedMessages.Count} selected")</MudText>
-        }
-            
-        <MudSelect @bind-Value="_moveToQueue" Variant="Variant.Outlined" Class="ml-1" Label="Send to queue" Margin="Margin.Dense" Dense="true" FullWidth="true" FitContent="true">
-            @foreach (var queueName in _queueNames)
+    @if (_readonlyMode is true)
+    {
+        <MudText Color="Color.Secondary" Typo="Typo.body2">Peek mode. <br/>Load messages to be able to change anything</MudText>
+    }
+    else if(_readonlyMode is false)
+    {
+        <MudStack Spacing="1" Row="true">
+            @if (_selectedMessages.Count > 0)
             {
-                <MudSelectItem Value="queueName">
-                    @($"{queueName}" + (queueName == QueueName ? " ★" : ""))
-                </MudSelectItem>
+                <MudIconButton Icon="@Icons.Material.Filled.Close" Color="Color.Inherit" OnClick="UnselectAll" title="Unselect all"/>
+                <MudText Class="align-content-center" Style="white-space: nowrap;" Color="Color.Info">@($"{_selectedMessages.Count} selected")</MudText>
             }
-        </MudSelect>
-        
-        @{
-            var howMany = _selectedMessages.Count > 0 ? $"{_selectedMessages.Count}" : "all";
-            var messages = MessageWord(_selectedMessages.Count);
-        }
-        <MudIconButton Icon="@Icons.Material.Filled.Send" Color="Color.Warning" OnClick="SendMessagesToQueue" title="@($"Send {howMany} {messages} to specified queue")" Disabled="@(!CanSendOrDeleteMessages)"/>
-        <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" Color="Color.Error" OnClick="DeleteMessages" title="@($"Delete {howMany} {messages}")" Disabled="@(!CanSendOrDeleteMessages)"/>
-    </MudStack>
+                
+            <MudSelect @bind-Value="_moveToQueue" Variant="Variant.Outlined" Class="ml-1" Label="Send to queue" Margin="Margin.Dense" Dense="true" FullWidth="true" FitContent="true">
+                @foreach (var queueName in _queueNames)
+                {
+                    <MudSelectItem Value="queueName">
+                        @($"{queueName}" + (queueName == QueueName ? " ★" : ""))
+                    </MudSelectItem>
+                }
+            </MudSelect>
+            
+            @{
+                var howMany = _selectedMessages.Count > 0 ? $"{_selectedMessages.Count}" : "all";
+                var messages = MessageWord(_selectedMessages.Count);
+            }
+            <MudIconButton Icon="@Icons.Material.Filled.Send" Color="Color.Warning" OnClick="SendMessagesToQueue" title="@($"Send {howMany} {messages} to specified queue")" Disabled="@(!CanSendOrDeleteMessages)"/>
+            <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" Color="Color.Error" OnClick="DeleteMessages" title="@($"Delete {howMany} {messages}")" Disabled="@(!CanSendOrDeleteMessages)"/>
+        </MudStack>
+    }
 </SectionContent>
 
 <PageTitle>@QueueName</PageTitle>

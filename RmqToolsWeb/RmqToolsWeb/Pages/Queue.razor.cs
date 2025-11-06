@@ -25,9 +25,11 @@ public partial class Queue
     string _moveToQueue = "";
     string[] _queueNames = [];
     int _numberOfRemoteMessages;
+    int _numberOfMessagesInDb;
     uint? _queueId;
     ShowMessageParts _showMessageParts = ShowMessageParts.Both;
     string _lineFilter = "";
+    bool? _readonlyMode;
 
     bool CanSendOrDeleteMessages => _queueId != null && _messages.Count != 0;
     
@@ -49,8 +51,20 @@ public partial class Queue
             if (requestedQueue.QueueId != null)
             {
                 _queueId = requestedQueue.QueueId;
-                var messages = (await Http.GetFromJsonAsync<List<Message>>($"/api/queues/{_queueId}/messages", MySourceGenerationContext.Default.ListMessage))!;
-                CreateMessageItems(messages);
+
+                if (requestedQueue.MessageCountInDb > 0)
+                {
+                    _readonlyMode = false;
+                    var messages = (await Http.GetFromJsonAsync<List<Message>>($"/api/queues/{_queueId}/messages", MySourceGenerationContext.Default.ListMessage))!;
+                    CreateMessageItems(messages);
+                    _numberOfMessagesInDb = messages.Count;
+                }
+                else if (requestedQueue.MessageCountInRmq > 0)
+                {
+                    _readonlyMode = true;
+                    var messages = (await Http.GetFromJsonAsync<List<Message>>($"/api/queue/peek?queue_name={QueueName}", MySourceGenerationContext.Default.ListMessage))!;
+                    CreateMessageItems(messages);
+                }
             }
         }
     }
@@ -65,6 +79,8 @@ public partial class Queue
             _queueId = content.QueueId;
             CreateMessageItems(content.Messages);
             _numberOfRemoteMessages = 0;
+            _numberOfMessagesInDb = _messages.Count;
+            _readonlyMode = false;
         }
         finally
         {
@@ -115,6 +131,7 @@ public partial class Queue
             _messages.Clear();
         else
             _messages.RemoveAll(x => _selectedMessages.Contains(x));
+        _numberOfMessagesInDb = _messages.Count;
         _selectedMessages.Clear();
     }
     

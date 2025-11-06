@@ -74,7 +74,11 @@ impl Rabbitmq {
         Ok(queues)
     }
 
-    pub async fn load_messages(&self, queue: &str) -> Result<Vec<GetMessage>, RabbitMQError> {
+    pub async fn load_messages(
+        &self,
+        queue: &str,
+        peek: bool,
+    ) -> Result<Vec<GetMessage>, RabbitMQError> {
         let queue_info = self.client.get_queue_info(&self.vhost, queue).await?;
         if queue_info.exclusive {
             return Err(RabbitMQError::Other(anyhow!(
@@ -83,13 +87,18 @@ impl Rabbitmq {
             )));
         }
 
+        let ack_mode = match peek {
+            true => "ack_requeue_true",
+            false => "ack_requeue_false",
+        };
+
         let messages = self
             .client
             .get_messages(
                 &self.vhost,
                 queue,
                 queue_info.message_count as u32,
-                "ack_requeue_false",
+                ack_mode,
             )
             .await?;
 

@@ -1,10 +1,10 @@
 mod api_error;
 
 use crate::api::api_error::ApiError;
-use crate::database::{Database, MessageSelector, QueueId};
+use crate::database::{Database, MessageId, MessageSelector, QueueId};
 use crate::dtos::{
     DeleteMessagesRequest, LoadMessagesByQueueNameQuery, LoadMessagesByQueueNameResponse, Message,
-    QueueSummary, RmqConnectionInfo, SendMessagesRequest,
+    PeekMessagesQuery, QueueSummary, RmqConnectionInfo, SendMessagesRequest,
 };
 use crate::rabbitmq::Rabbitmq;
 use anyhow::Result;
@@ -52,6 +52,7 @@ pub fn build_api(rmq_client: Rabbitmq, database: Database) -> Router {
             Router::new()
                 .route("/rmq_connection", get(get_rmq_connection_info))
                 .route("/queue/load", post(load_messages_by_queue_name))
+                .route("/queue/peek", get(peek_messages))
                 .route("/queues", get(list_queues))
                 .route("/queues/{queue_id}/messages", get(get_messages))
                 .route("/queues/{queue_id}/messages", delete(delete_messages))
@@ -162,7 +163,7 @@ pub async fn load_messages_by_queue_name(
 
     let rmq_messages = guarded
         .rabbitmq
-        .load_messages(&query.queue_name)
+        .load_messages(&query.queue_name, false)
         .await?
         .into_iter()
         .map(|x| (x.payload, x.properties.0))
@@ -177,4 +178,26 @@ pub async fn load_messages_by_queue_name(
         .get_messages(&MessageSelector::AllInQueue(queue_id))?;
 
     Ok(Json(LoadMessagesByQueueNameResponse { queue_id, messages }))
+}
+
+pub async fn peek_messages(
+    State(state): State<AppState>,
+    Query(query): Query<PeekMessagesQuery>,
+) -> Result<Json<Vec<Message>>, ApiError> {
+    let guarded = state.guarded.lock().await;
+
+    let rmq_messages = guarded
+        .rabbitmq
+        .load_messages(&query.queue_name, true)
+        .await?
+        .into_iter()
+        .enumerate()
+        .map(|(i, msg)| Message {
+            id: i as MessageId,
+            payload: msg.payload,
+            headers: msg.properties.0,
+        })
+        .collect::<Vec<_>>();
+
+    Ok(Json(rmq_messages))
 }
