@@ -12,9 +12,7 @@
             </div>
         </div>
 
-        <div>
-            <MudButton Variant="Variant.Outlined" Color="Color.Info" OnClick="LoadMessages">Load messages</MudButton>
-        </div>
+        <MudButton Variant="Variant.Outlined" Color="Color.Info" OnClick="LoadMessages">Load messages</MudButton>
     </MudStack>
     
     <MudSpacer />
@@ -23,10 +21,10 @@
         @if (_selectedMessages.Count > 0)
         {
             <MudIconButton Icon="@Icons.Material.Filled.Close" Color="Color.Inherit" OnClick="UnselectAll" title="Unselect all"/>
-            <MudText Class="align-content-center" Color="Color.Info">@($"{_selectedMessages.Count} selected")</MudText>
+            <MudText Class="align-content-center" Style="white-space: nowrap;" Color="Color.Info">@($"{_selectedMessages.Count} selected")</MudText>
         }
             
-        <MudSelect @bind-Value="_moveToQueue" Variant="Variant.Outlined" Label="Send to queue" Margin="Margin.Dense" Dense="true" FullWidth="true" FitContent="true">
+        <MudSelect @bind-Value="_moveToQueue" Variant="Variant.Outlined" Class="ml-1" Label="Send to queue" Margin="Margin.Dense" Dense="true" FullWidth="true" FitContent="true">
             @foreach (var queueName in _queueNames)
             {
                 <MudSelectItem Value="queueName">

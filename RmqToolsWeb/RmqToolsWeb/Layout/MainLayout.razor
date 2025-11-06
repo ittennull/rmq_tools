@@ -13,10 +13,10 @@
 @* Needed for snackbars *@
 <MudSnackbarProvider />
 
-<MudLayout>
-    <MudAppBar Elevation="1" Dense="false" Class="sticky mud-dark-text" Style=@($"background:{Colors.BlueGray.Lighten5};")>
-        <MudIconButton Icon="@Icons.Material.Filled.Home" Color="Color.Inherit" Size="Size.Medium" Edge="Edge.Start" OnClick="GoHome"/>
-        <MudDivider Vertical="true" FlexItem="true" Class="ml-3"/>
+<MudLayout Class="d-flex flex-column">
+    <MudPaper Class="pa-1 ma-0 d-flex flex-row flex-wrap align-center" Elevation="1" Style="@($"background:{Colors.BlueGray.Lighten5};")" Width="100%">
+        <MudIconButton Icon="@Icons.Material.Filled.Home" Color="Color.Inherit" Size="Size.Medium" OnClick="GoHome"/>
+        <MudDivider Vertical="true" FlexItem="true" Class="ml-1"/>
 
         @if (_rmqConnectionInfo != null)
         {
@@ -28,9 +28,9 @@
         <MudDivider Vertical="true" FlexItem="true" Class="mr-5"/>
 
         <SectionOutlet SectionName="top-bar"/>
-    </MudAppBar>
+    </MudPaper>
 
-    <MudMainContent Class="pt-0 d-flex flex-column" Style="height: calc(100% - 64px);">
+    <MudMainContent Class="pt-0 d-flex flex-column overflow-auto">
         @Body
     </MudMainContent>
 </MudLayout>
