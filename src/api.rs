@@ -10,7 +10,7 @@ use crate::rabbitmq::Rabbitmq;
 use anyhow::Result;
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderValue;
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use axum_macros::debug_handler;
 use std::sync::Arc;
@@ -57,6 +57,10 @@ pub fn build_api(rmq_client: Rabbitmq, database: Database) -> Router {
                 .route("/queues/{queue_id}/messages", get(get_messages))
                 .route("/queues/{queue_id}/messages", delete(delete_messages))
                 .route("/queues/{queue_id}/messages/send", post(send_messages))
+                .route(
+                    "/queues/{queue_id}/messages/{message_id}",
+                    put(update_message),
+                )
                 .with_state(state)
                 .layer(cors_layer),
         )
@@ -200,4 +204,20 @@ pub async fn peek_messages(
         .collect::<Vec<_>>();
 
     Ok(Json(rmq_messages))
+}
+
+pub async fn update_message(
+    State(state): State<AppState>,
+    Path((queue_id, message_id)): Path<(QueueId, MessageId)>,
+    payload: String,
+) -> Result<(), ApiError> {
+    let guarded = state.guarded.lock().await;
+    let changed = guarded
+        .database
+        .set_message_payload(queue_id, message_id, &payload)?;
+
+    match changed {
+        true => Ok(()),
+        false => Err(ApiError::MessageNotFound(message_id)),
+    }
 }

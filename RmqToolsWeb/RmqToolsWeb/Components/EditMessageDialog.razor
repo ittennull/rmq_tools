@@ -1,0 +1,57 @@
+@using System.Text
+@using System.Text.Json
+@inject HttpClient Http
+@inject ISnackbar Snackbar
+
+<MudDialog ContentStyle="min-width: 800px;">
+    <DialogContent>
+        <MudTextField T="string" Variant="Variant.Outlined" Value="@_payload" ValueChanged="OnValueChanged" 
+                      Immediate="true" Lines="20" AutoGrow="true" FullWidth="true" spellcheck="false" />
+    </DialogContent>
+    <DialogActions>
+        @if (_isValidJson is false)
+        {
+            <MudText Color="Color.Error" Class="mr-3">Not a valid JSON</MudText>
+        }
+        <MudButton Color="Color.Primary" Variant="Variant.Outlined" OnClick="Save">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public uint QueueId { get; set; }
+    [Parameter] public Message Message { get; set; }
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; }
+
+    string _payload = string.Empty;
+    bool? _isValidJson;
+
+    protected override void OnInitialized()
+    {
+        _payload = Message.Payload;
+    }
+
+    void OnValueChanged(string payload)
+    {
+        _payload = payload;
+
+        try
+        {
+            var reader = new Utf8JsonReader(Encoding.UTF8.GetBytes(_payload));
+            _isValidJson = JsonDocument.TryParseValue(ref reader, out _);
+        }
+        catch
+        {
+            _isValidJson = false;
+        }
+    }
+
+    private async Task Save()
+    {
+        using var body = new StringContent(_payload);
+        using var response = await Http.PutAsync($"/api/queues/{QueueId}/messages/{Message.Id}", body);
+        response.EnsureSuccessStatusCode();
+
+        Snackbar.Add("Message updated", Severity.Success);
+        MudDialog.Close(DialogResult.Ok(_payload));
+    }
+}

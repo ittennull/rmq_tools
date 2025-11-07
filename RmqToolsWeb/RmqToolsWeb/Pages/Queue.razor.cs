@@ -273,4 +273,25 @@ public partial class Queue
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Large };
         await DialogService.ShowAsync<ExportFilteredLinesDialog>("Filtered lines", parameters, options);
     }
+
+    async Task EditMessage(int messageIndex)
+    {
+        var index = messageIndex - 1;
+        var message = _messages[index].Message;
+        var parameters = new DialogParameters<EditMessageDialog>
+        {
+            { x => x.QueueId, _queueId!.Value },
+            { x => x.Message, message },
+        };
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraLarge };
+        var dialog = await DialogService.ShowAsync<EditMessageDialog>("Edit message payload", parameters, options);
+        var result = await dialog.Result;
+        if (!result!.Canceled)
+        {
+            _messages[index] = _messages[index] with
+            {
+                Message = _messages[index].Message with { Payload = (string)result.Data! }
+            };
+        }
+    }
 }

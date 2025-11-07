@@ -129,6 +129,19 @@ impl Database {
         Ok(queue_id)
     }
 
+    pub fn set_message_payload(
+        &self,
+        queue_id: QueueId,
+        message_id: MessageId,
+        payload: &str,
+    ) -> Result<bool, DatabaseError> {
+        let num_changed = self.connection.execute(
+            "UPDATE messages SET payload = ? WHERE id = ? AND queue_id = ?",
+            (payload, message_id, queue_id),
+        )?;
+        Ok(num_changed == 1)
+    }
+
     pub fn save_messages(
         &self,
         queue_id: QueueId,
