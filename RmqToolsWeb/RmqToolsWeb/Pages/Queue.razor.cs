@@ -59,12 +59,13 @@ public partial class Queue
                     CreateMessageItems(messages);
                     _numberOfMessagesInDb = messages.Count;
                 }
-                else if (requestedQueue.MessageCountInRmq > 0)
-                {
-                    _readonlyMode = true;
-                    var messages = (await Http.GetFromJsonAsync<List<Message>>($"/api/queue/peek?queue_name={QueueName}", MySourceGenerationContext.Default.ListMessage))!;
-                    CreateMessageItems(messages);
-                }
+            }
+            
+            if (_readonlyMode == null && requestedQueue.MessageCountInRmq > 0)
+            {
+                _readonlyMode = true;
+                var messages = (await Http.GetFromJsonAsync<List<Message>>($"/api/queue/peek?queue_name={QueueName}", MySourceGenerationContext.Default.ListMessage))!;
+                CreateMessageItems(messages);
             }
         }
     }
