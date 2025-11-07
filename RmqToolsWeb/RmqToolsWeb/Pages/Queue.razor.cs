@@ -20,7 +20,7 @@ public partial class Queue
     [Inject] IDialogService DialogService { get; set; }
 
     bool _loading = true;
-    List<MessageItem> _messages = [];
+    readonly List<MessageItem> _messages = [];
     HashSet<MessageItem> _selectedMessages = [];
     string _moveToQueue = "";
     string[] _queueNames = [];

@@ -12,7 +12,6 @@ use axum::extract::{Path, Query, State};
 use axum::http::HeaderValue;
 use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
-use axum_macros::debug_handler;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
@@ -38,9 +37,17 @@ impl AppState {
     }
 }
 
-pub fn build_api(rmq_client: Rabbitmq, database: Database) -> Router {
+pub fn build_api(
+    rmq_client: Rabbitmq,
+    database: Database,
+    wwwroot_dir: std::path::PathBuf,
+) -> Router {
     let state = AppState::new(rmq_client, database);
 
+    let mut index_html_path = wwwroot_dir.clone();
+    index_html_path.push("index.html");
+
+    // CORS for local development when UI runs on a different port
     let cors_layer = CorsLayer::new()
         .allow_methods(Any)
         .allow_headers(Any)
@@ -64,14 +71,13 @@ pub fn build_api(rmq_client: Rabbitmq, database: Database) -> Router {
                 .with_state(state)
                 .layer(cors_layer),
         )
-        .fallback_service(ServeDir::new("wwwroot").fallback(ServeFile::new("wwwroot/index.html")))
+        .fallback_service(ServeDir::new(wwwroot_dir).fallback(ServeFile::new(index_html_path)))
 }
 
 async fn get_rmq_connection_info(State(state): State<AppState>) -> Json<RmqConnectionInfo> {
     Json(state.rmq_connection_info)
 }
 
-#[debug_handler]
 async fn list_queues(State(state): State<AppState>) -> Result<Json<Vec<QueueSummary>>, ApiError> {
     let guarded = state.guarded.lock().await;
 
