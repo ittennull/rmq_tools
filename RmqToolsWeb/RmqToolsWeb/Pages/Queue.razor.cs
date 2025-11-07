@@ -19,7 +19,7 @@ public partial class Queue
     [Inject] public HttpClient Http { get; set; }
     [Inject] IDialogService DialogService { get; set; }
 
-    bool _loading;
+    bool _loading = true;
     List<MessageItem> _messages = [];
     HashSet<MessageItem> _selectedMessages = [];
     string _moveToQueue = "";
@@ -68,6 +68,8 @@ public partial class Queue
                 CreateMessageItems(messages);
             }
         }
+        
+        _loading = false;
     }
 
     async Task LoadMessages()
