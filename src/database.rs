@@ -153,19 +153,16 @@ impl Database {
             s
         };
 
-        let converted_messages = messages
+        let headers_json = messages
             .iter()
-            .map(|(msg, headers)| {
-                let headers = serde_json::to_string(&headers);
-                headers.map(|h| (msg, h))
-            })
+            .map(|(_, headers)| serde_json::to_string(headers))
             .collect::<Result<Vec<_>, _>>()?;
 
         let mut values: Vec<&dyn ToSql> = Vec::with_capacity(3 * messages.len());
-        for message in &converted_messages {
+        for i in 0..messages.len() {
             values.push(&queue_id);
-            values.push(message.0);
-            values.push(&message.1);
+            values.push(&messages[i].0);
+            values.push(&headers_json[i]);
         }
 
         self.connection.execute(
