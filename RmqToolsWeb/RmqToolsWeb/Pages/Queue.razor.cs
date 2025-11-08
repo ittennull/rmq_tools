@@ -30,12 +30,22 @@ public partial class Queue
     ShowMessageParts _showMessageParts = ShowMessageParts.Both;
     string _lineFilter = "";
     bool? _readonlyMode;
+    string _groupBySelector = "";
+    Func<MessageItem, object>? _groupBy;
+    MudDataGrid<MessageItem> _dataGrid;
 
     bool CanSendOrDeleteMessages => _queueId != null && _messages.Count != 0;
+    private bool GroupingEnabled => _groupBySelector != string.Empty;
     
     protected override async Task OnInitializedAsync()
     {
         _moveToQueue = QueueName;
+
+        _groupBy = x =>
+        {
+            var (wholeLine, _) = FindString(x.CombinedString, _groupBySelector, 0);
+            return wholeLine;
+        };
 
         var queues = (await Http.GetFromJsonAsync<List<QueueSummary>>("/api/queues", MySourceGenerationContext.Default.ListQueueSummary))!;
         _queueNames = queues
@@ -168,12 +178,16 @@ public partial class Queue
                 foreach (var prop in kvp.Value.EnumerateObject())
                 {
                     sb.Append(prop.Name);
+                    sb.Append(": ");
                     sb.Append(prop.Value);
+                    sb.AppendLine();
                 }
             }
             else
             {
+                sb.Append(": ");
                 sb.Append(kvp.Value);
+                sb.AppendLine();
             }
         }
 
@@ -198,7 +212,7 @@ public partial class Queue
         int index = 0;
         while (true)
         {
-            var (wholeLine, endIndex) = FindString(line, index);
+            var (wholeLine, endIndex) = FindString(line, _lineFilter, index);
             if (wholeLine != null)
                 yield return wholeLine;
             
@@ -209,12 +223,12 @@ public partial class Queue
         }
     }
 
-    (string? wholeLine, int endIndex) FindString(string line, int lineStartIndex)
+    (string? wholeLine, int endIndex) FindString(string line, string token, int lineStartIndex)
     {
         if (line.Length == 0)
             return default;
         
-        var index = line.IndexOf(_lineFilter, lineStartIndex, StringComparison.InvariantCultureIgnoreCase);
+        var index = line.IndexOf(token, lineStartIndex, StringComparison.InvariantCultureIgnoreCase);
         if (index == -1)
             return default;
         
@@ -223,7 +237,7 @@ public partial class Queue
         startIndex += 1;
         
         // find an end of the string
-        var endIndex = line.IndexOf('\n', index + _lineFilter.Length);
+        var endIndex = line.IndexOf('\n', index + token.Length);
         endIndex = endIndex == -1 ? line.Length : endIndex + 1;
 
         return (line[startIndex .. endIndex], endIndex);
@@ -233,7 +247,7 @@ public partial class Queue
     {
         var sb = new StringBuilder();
 
-        foreach (var messageItem in _messages)
+        foreach (var messageItem in _dataGrid.FilteredItems)
         {
             if (_showMessageParts is ShowMessageParts.Headers or ShowMessageParts.Both)
             {
@@ -295,6 +309,14 @@ public partial class Queue
             {
                 Message = _messages[index].Message with { Payload = (string)result.Data! }
             };
+        }
+    }
+
+    void SelectAllInGroup(IGrouping<object, MessageItem> group)
+    {
+        foreach (var messageItem in group)
+        {
+            _dataGrid.SelectedItems.Add(messageItem);
         }
     }
 }
