@@ -15,7 +15,7 @@ use std::path::PathBuf;
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
-    let rmq_client = Rabbitmq::new(&args.url, &args.vhost)?;
+    let rmq_client = Rabbitmq::connect(&args.url, &args.vhost).await?;
     let connection_info = rmq_client.get_connection_info();
     let database = Database::new(&connection_info.domain, &connection_info.vhost)?;
     let wwwroot_dir = get_wwwroot_directory()?;
@@ -28,7 +28,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn get_wwwroot_directory() -> Result<PathBuf> { 
+fn get_wwwroot_directory() -> Result<PathBuf> {
     const WWWROOT_DIR: &str = "wwwroot";
 
     let mut path = std::env::current_exe()?;

@@ -1,6 +1,6 @@
 use crate::dtos::RmqConnectionInfo;
 use crate::types::rmq_types::RemoteQueue;
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use rabbitmq_http_client::api::{Client, HttpClientError};
 use rabbitmq_http_client::requests::shovels::MessageProperties;
 use rabbitmq_http_client::responses::GetMessage;
@@ -23,16 +23,11 @@ pub enum RabbitMQError {
 }
 
 impl Rabbitmq {
-    pub fn new(url: &str, vhost: &str) -> Result<Self, anyhow::Error> {
+    pub async fn connect(url: &str, vhost: &str) -> Result<Self, anyhow::Error> {
         let url = Url::parse(url)?;
         let domain = url.domain().expect("Domain is missing").to_string();
-        let endpoint = format!(
-            "{}://{}:{}{}",
-            url.scheme(),
-            domain,
-            url.port().unwrap_or(443),
-            url.path()
-        );
+        let port = url.port().unwrap_or(443);
+        let endpoint = format!("{}://{}:{}{}", url.scheme(), domain, port, url.path());
 
         println!(
             "Connecting to endpoint '{}' and vhost '{}'",
@@ -43,6 +38,12 @@ impl Rabbitmq {
             url.username().to_string(),
             url.password().expect("Password is missing").to_string(),
         );
+
+        // check connection by getting a cluster name
+        client
+            .get_cluster_name()
+            .await
+            .context("Can't connect to RabbitMQ")?;
 
         Ok(Self {
             client,
