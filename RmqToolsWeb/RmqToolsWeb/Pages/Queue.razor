@@ -64,7 +64,7 @@
     <MudTextField @bind-Value="_groupBySelector" Label="Group by line containing" Variant="Variant.Text" Clearable="true" Class="mr-5" />
     <MudTextField Value="_lineFilter" Label="Line filter" Variant="Variant.Text" ValueChanged="@((string s) => SetLineFilter(s))" Clearable="true"  />
     <MudIconButton Icon="@Icons.Material.Filled.LibraryBooks" Color="Color.Inherit" Size="Size.Medium" Edge="Edge.Start" OnClick="ExportFilteredLines"
-                   Disabled="@(_lineFilter == string.Empty)" title="Export filtered lines" Class="ml-1" />
+                   Disabled="@(string.IsNullOrWhiteSpace(_lineFilter))" title="Export filtered lines" Class="ml-1" />
 </MudStack>
 
 <MudDataGrid @ref="_dataGrid" 
@@ -104,14 +104,14 @@
                     {
                         if (kvp.Value.ValueKind == JsonValueKind.Object)
                         {
-                            <MudHighlighter Text="@GetFilteredLines($"{kvp.Key}: ").FirstOrDefault()" HighlightedText="@_lineFilter" CaseSensitive="false"/>
+                            <Highlighter Text="@GetFilteredLines($"{kvp.Key}: ").FirstOrDefault()" Token="@_lineFilter"/>
                             <div class="ml-5">
                                 @foreach (var prop in kvp.Value.EnumerateObject())
                                 {
                                     foreach (var line in GetFilteredLines($"{prop.Name}: {prop.Value.ToString()}"))
                                     {
                                         <div style="white-space: pre-wrap;">
-                                            <MudHighlighter Text="@line" HighlightedText="@_lineFilter" CaseSensitive="false"/>
+                                            <Highlighter Text="@line" Token="@_lineFilter" />
                                         </div>
                                     }
                                 }
@@ -120,7 +120,7 @@
                         else
                         {
                             <div>
-                                <MudHighlighter Text="@GetFilteredLines($"{kvp.Key}: {kvp.Value}").FirstOrDefault()" HighlightedText="@_lineFilter" CaseSensitive="false"/>
+                                <Highlighter Text="@GetFilteredLines($"{kvp.Key}: {kvp.Value}").FirstOrDefault()" Token="@_lineFilter" />
                             </div>
                         }
                     }
@@ -137,7 +137,7 @@
                         <pre>
                             @foreach (var line in GetFilteredLines(context.Item.Message.Payload))
                             {
-                                <MudHighlighter Text="@line" HighlightedText="@_lineFilter" CaseSensitive="false" />
+                                <Highlighter Text="@line" Token="@_lineFilter" />
                             }
                         </pre>
                     </MudText>

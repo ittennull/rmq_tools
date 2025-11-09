@@ -1,0 +1,46 @@
+@using System.Text
+
+@((MarkupString)_highlightedText)
+
+@code {
+    [Parameter] public string Text { get; set; }
+    [Parameter] public string Token { get; set; }
+    
+    string _highlightedText = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        if (string.IsNullOrWhiteSpace(Text) || string.IsNullOrWhiteSpace(Token))
+        {
+            _highlightedText = Text;
+            return;
+        }
+
+        StringBuilder? sb = null;
+        var textSpan = Text.AsSpan();
+        while (textSpan.Length > 0)
+        {
+            var index = textSpan.IndexOf(Token, StringComparison.InvariantCultureIgnoreCase);
+            if (index == -1)
+                break;
+
+            sb ??= new();
+            sb.Append(textSpan.Slice(0, index));
+            sb.Append("<mark>");
+            sb.Append(textSpan.Slice(index, Token.Length));
+            sb.Append("</mark>");
+            
+            textSpan = textSpan.Slice(index + Token.Length);
+        }
+
+        if (sb == null)
+        {
+            _highlightedText = Text;
+        }
+        else
+        {
+            sb.Append(textSpan);
+            _highlightedText = sb.ToString();
+        }
+    }
+}

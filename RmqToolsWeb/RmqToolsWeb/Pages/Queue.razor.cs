@@ -203,7 +203,7 @@ public partial class Queue
 
     IEnumerable<string> GetFilteredLines(string line)
     {
-        if (_lineFilter == string.Empty)
+        if (string.IsNullOrWhiteSpace(_lineFilter))
         {
             yield return line;
             yield break;
