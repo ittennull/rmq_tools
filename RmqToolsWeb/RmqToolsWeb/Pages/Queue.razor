@@ -68,7 +68,7 @@
 </MudStack>
 
 <MudDataGrid @ref="_dataGrid" 
-        Items="@_messages" Dense="true" Hover="true" Loading="@_loading" Hideable="true"
+        Items="@_messages" Dense="true" Hover="true" Loading="@_loading" Hideable="true" RowStyle="vertical-align: top;"
         ColumnsPanelReordering="true" Elevation="5" Class="overflow-auto"
         MultiSelection="true" @bind-SelectedItems="_selectedMessages" SelectOnRowClick="false"
         Filterable="true" FilterMode="DataGridFilterMode.ColumnFilterRow" FilterCaseSensitivity="DataGridFilterCaseSensitivity.CaseInsensitive">
