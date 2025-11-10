@@ -1,6 +1,5 @@
-﻿@using MySourceGenerationContext = RmqToolsWeb.MySourceGenerationContext
-@inherits LayoutComponentBase
-@inject HttpClient Http
+﻿@inherits LayoutComponentBase
+@inject Api Api
 @inject NavigationManager Navigation
 
 @* Required *@
@@ -40,7 +39,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _rmqConnectionInfo = await Http.GetFromJsonAsync<RmqConnectionInfo>("/api/rmq_connection", MySourceGenerationContext.Default.RmqConnectionInfo);
+        _rmqConnectionInfo = await Api.GetRmqConnectionInfoAsync();
     }
 
     void GoHome()

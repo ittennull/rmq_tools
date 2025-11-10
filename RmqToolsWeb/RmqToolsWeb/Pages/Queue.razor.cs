@@ -1,4 +1,3 @@
-using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Components;
@@ -16,7 +15,7 @@ public partial class Queue
     [Parameter]
     public required string QueueName { get; set; }
     
-    [Inject] public HttpClient Http { get; set; }
+    [Inject] Api Api { get; set; }
     [Inject] IDialogService DialogService { get; set; }
 
     bool _loading = true;
@@ -35,7 +34,7 @@ public partial class Queue
     MudDataGrid<MessageItem> _dataGrid;
 
     bool CanSendOrDeleteMessages => _queueId != null && _messages.Count != 0;
-    private bool GroupingEnabled => _groupBySelector != string.Empty;
+    bool GroupingEnabled => _groupBySelector != string.Empty;
     
     protected override async Task OnInitializedAsync()
     {
@@ -47,7 +46,7 @@ public partial class Queue
             return wholeLine;
         };
 
-        var queues = (await Http.GetFromJsonAsync<List<QueueSummary>>("/api/queues", MySourceGenerationContext.Default.ListQueueSummary))!;
+        var queues = await Api.GetQueueSummariesAsync();
         _queueNames = queues
             .Where(x => !x.Exclusive)
             .Select(x => x.Name)
@@ -65,7 +64,7 @@ public partial class Queue
                 if (requestedQueue.MessageCountInDb > 0)
                 {
                     _readonlyMode = false;
-                    var messages = (await Http.GetFromJsonAsync<List<Message>>($"/api/queues/{_queueId}/messages", MySourceGenerationContext.Default.ListMessage))!;
+                    var messages = await Api.GetMessagesFromDbAsync(_queueId.Value);
                     CreateMessageItems(messages);
                     _numberOfMessagesInDb = messages.Count;
                 }
@@ -74,7 +73,7 @@ public partial class Queue
             if (_readonlyMode == null && requestedQueue.MessageCountInRmq > 0)
             {
                 _readonlyMode = true;
-                var messages = (await Http.GetFromJsonAsync<List<Message>>($"/api/queue/peek?queue_name={QueueName}", MySourceGenerationContext.Default.ListMessage))!;
+                var messages = await Api.PeekRmqMessagesAsync(QueueName);
                 CreateMessageItems(messages);
             }
         }
@@ -87,10 +86,8 @@ public partial class Queue
         _loading = true;
         try
         {
-            using var response = await Http.PostAsync($"/api/queue/load?queue_name={QueueName}", null);
-            var content = (await response.Content.ReadFromJsonAsync<LoadMessagesByQueueNameResponse>(MySourceGenerationContext.Default.LoadMessagesByQueueNameResponse))!;
-            _queueId = content.QueueId;
-            CreateMessageItems(content.Messages);
+            (_queueId, var messages) = await Api.LoadMessagesToDbAsync(QueueName);
+            CreateMessageItems(messages);
             _numberOfRemoteMessages = 0;
             _numberOfMessagesInDb = _messages.Count;
             _readonlyMode = false;
@@ -109,13 +106,9 @@ public partial class Queue
     async Task DeleteMessages()
     {
         ShowLoadingForOperationOnMessages();
-        
-        var body = new DeleteMessagesRequest(_selectedMessages.Select(x => x.Message.Id));
-        using var httpRequestMessage = new HttpRequestMessage(HttpMethod.Delete, $"/api/queues/{_queueId}/messages");
-        httpRequestMessage.Content = new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(body, MySourceGenerationContext.Default.DeleteMessagesRequest));
-        httpRequestMessage.Content.Headers.ContentType = new("application/json");
-        using var response = await Http.SendAsync(httpRequestMessage);
-        response.EnsureSuccessStatusCode();
+
+        var messageIds = _selectedMessages.Select(x => x.Message.Id);
+        await Api.DeleteMessagesAsync(_queueId!.Value, messageIds);
 
         ClearMessagesAfterOperation();
         
@@ -126,9 +119,8 @@ public partial class Queue
     {
         ShowLoadingForOperationOnMessages();
         
-        var body = new SendMessagesRequest(_moveToQueue, _selectedMessages.Select(x => x.Message.Id));
-        using var response = await Http.PostAsJsonAsync($"/api/queues/{_queueId}/messages/send", body, MySourceGenerationContext.Default.SendMessagesRequest);
-        response.EnsureSuccessStatusCode();
+        var messageIds = _selectedMessages.Select(x => x.Message.Id);
+        await Api.SendMessagesToQueueAsync(_queueId!.Value, messageIds, _moveToQueue);
 
         if (_moveToQueue == QueueName)
             _numberOfRemoteMessages += _selectedMessages.Count == 0 ? _messages.Count : _selectedMessages.Count;

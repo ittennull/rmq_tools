@@ -1,6 +1,6 @@
 @using System.Text
 @using System.Text.Json
-@inject HttpClient Http
+@inject Api Api
 @inject ISnackbar Snackbar
 
 <MudDialog ContentStyle="min-width: 800px;">
@@ -47,9 +47,7 @@
 
     private async Task Save()
     {
-        using var body = new StringContent(_payload);
-        using var response = await Http.PutAsync($"/api/queues/{QueueId}/messages/{Message.Id}", body);
-        response.EnsureSuccessStatusCode();
+        await Api.SaveMessageAsync(QueueId, Message.Id, _payload);
 
         Snackbar.Add("Message updated", Severity.Success);
         MudDialog.Close(DialogResult.Ok(_payload));

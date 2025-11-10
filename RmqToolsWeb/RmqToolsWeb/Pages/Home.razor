@@ -1,6 +1,5 @@
 ﻿@page "/"
-@using MySourceGenerationContext = RmqToolsWeb.MySourceGenerationContext
-@inject HttpClient Http
+@inject Api Api
 @inject NavigationManager Navigation
 
 <SectionContent SectionName="top-bar">
@@ -46,7 +45,7 @@
     
     protected override async Task OnInitializedAsync()
     {
-        _queues = (await Http.GetFromJsonAsync<List<QueueSummary>>("/api/queues", MySourceGenerationContext.Default.ListQueueSummary))!;
+        _queues = await Api.GetQueueSummariesAsync();
         _queues.Sort((x, y) => String.Compare(x.Name, y.Name, StringComparison.Ordinal));
     }
 
