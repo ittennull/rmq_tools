@@ -19,7 +19,8 @@
 
 @code {
     [Parameter] public uint QueueId { get; set; }
-    [Parameter] public Message Message { get; set; }
+    [Parameter] public uint MessageId { get; set; }
+    [Parameter] public string MessagePayload { get; set; }
     [CascadingParameter] private IMudDialogInstance MudDialog { get; set; }
 
     string _payload = string.Empty;
@@ -27,7 +28,7 @@
 
     protected override void OnInitialized()
     {
-        _payload = Message.Payload;
+        _payload = MessagePayload;
     }
 
     void OnValueChanged(string payload)
@@ -47,7 +48,7 @@
 
     private async Task Save()
     {
-        await Api.SaveMessageAsync(QueueId, Message.Id, _payload);
+        await Api.SaveMessageAsync(QueueId, MessageId, _payload);
 
         Snackbar.Add("Message updated", Severity.Success);
         MudDialog.Close(DialogResult.Ok(_payload));

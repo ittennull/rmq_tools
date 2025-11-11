@@ -100,30 +100,12 @@
             <CellTemplate>
                 @if (_showMessageParts is ShowMessageParts.Headers or ShowMessageParts.Both)
                 {
-                    @foreach (var kvp in context.Item.Message.Headers)
-                    {
-                        if (kvp.Value.ValueKind == JsonValueKind.Object)
+                    <div style="white-space: pre-wrap;">
+                        @foreach (var line in context.Item.HeaderLines)
                         {
-                            <Highlighter Text="@GetFilteredLines($"{kvp.Key}: ").FirstOrDefault()" Token="@_lineFilter"/>
-                            <div class="ml-5">
-                                @foreach (var prop in kvp.Value.EnumerateObject())
-                                {
-                                    foreach (var line in GetFilteredLines($"{prop.Name}: {prop.Value.ToString()}"))
-                                    {
-                                        <div style="white-space: pre-wrap;">
-                                            <Highlighter Text="@line" Token="@_lineFilter" />
-                                        </div>
-                                    }
-                                }
-                            </div>
+                            <Highlighter Text="@FilterLine(line, _lineFilter)" Token="@_lineFilter"/>
                         }
-                        else
-                        {
-                            <div>
-                                <Highlighter Text="@GetFilteredLines($"{kvp.Key}: {kvp.Value}").FirstOrDefault()" Token="@_lineFilter" />
-                            </div>
-                        }
-                    }
+                    </div>
             
                     @if (_showMessageParts is ShowMessageParts.Both)
                     {
@@ -135,9 +117,9 @@
                 {
                     <MudText Color="Color.Info">
                         <pre>
-                            @foreach (var line in GetFilteredLines(context.Item.Message.Payload))
+                            @foreach (var line in context.Item.PayloadLines)
                             {
-                                <Highlighter Text="@line" Token="@_lineFilter" />
+                                <Highlighter Text="@FilterLine(line, _lineFilter)" Token="@_lineFilter"/>
                             }
                         </pre>
                     </MudText>

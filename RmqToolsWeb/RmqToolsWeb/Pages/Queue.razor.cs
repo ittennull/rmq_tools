@@ -10,7 +10,7 @@ public partial class Queue
 {
     enum ShowMessageParts { Both, Headers, Payload }
     
-    record MessageItem(int Index, Message Message, string CombinedString);
+    record MessageItem(int Index, uint MessageId, string CombinedString, List<string> HeaderLines, List<string> PayloadLines);
     
     [Parameter]
     public required string QueueName { get; set; }
@@ -42,8 +42,18 @@ public partial class Queue
 
         _groupBy = x =>
         {
-            var (wholeLine, _) = FindString(x.CombinedString, _groupBySelector, 0);
-            return wholeLine;
+            foreach (var line in x.HeaderLines)
+            {
+                if (FilterLine(line, _groupBySelector) != null)
+                    return line;
+            }
+            foreach (var line in x.PayloadLines)
+            {
+                if (FilterLine(line, _groupBySelector) != null)
+                    return line;
+            }
+
+            return null!;
         };
 
         var queues = await Api.GetQueueSummariesAsync();
@@ -107,10 +117,14 @@ public partial class Queue
     {
         ShowLoadingForOperationOnMessages();
 
-        var messageIds = _selectedMessages.Select(x => x.Message.Id);
+        var messageIds = _selectedMessages.Select(x => x.MessageId);
         await Api.DeleteMessagesAsync(_queueId!.Value, messageIds);
 
         ClearMessagesAfterOperation();
+
+        //update indexes
+        for (var i = 0; i < _messages.Count; i++)
+            _messages[i] = _messages[i] with { Index = i + 1 };
         
         _loading = false;
     }
@@ -119,7 +133,7 @@ public partial class Queue
     {
         ShowLoadingForOperationOnMessages();
         
-        var messageIds = _selectedMessages.Select(x => x.Message.Id);
+        var messageIds = _selectedMessages.Select(x => x.MessageId);
         await Api.SendMessagesToQueueAsync(_queueId!.Value, messageIds, _moveToQueue);
 
         if (_moveToQueue == QueueName)
@@ -154,36 +168,48 @@ public partial class Queue
         _messages.Clear();
         _messages.AddRange(messages
             .Index()
-            .Select(x => new MessageItem(x.Index + 1, x.Item, GetCombinedString(x.Item)))
+            .Select(x =>
+            {
+                var headerLines = CreateHeaderLines(x.Item.Headers);
+                var payloadLines = CreatePayloadLines(x.Item.Payload);
+                var combinedString = GetCombinedString(headerLines, payloadLines);
+                return new MessageItem(x.Index + 1, x.Item.Id, combinedString, headerLines, payloadLines);
+            })
             .OrderBy(x => x.Index));
     }
 
-    string GetCombinedString(Message message)
+    List<string> CreatePayloadLines(string payload) => payload.Split('\n').Select(x => $"{x}\n").ToList();
+
+    List<string> CreateHeaderLines(Dictionary<string, JsonElement> headers)
     {
-        var sb = new StringBuilder();
-        
-        foreach (var kvp in message.Headers)
+        var list = new List<string>(headers.Count);
+        foreach (var kvp in headers)
         {
-            sb.Append(kvp.Key);
             if (kvp.Value.ValueKind == JsonValueKind.Object)
             {
+                list.Add($"{kvp.Key}:\n");
                 foreach (var prop in kvp.Value.EnumerateObject())
                 {
-                    sb.Append(prop.Name);
-                    sb.Append(": ");
-                    sb.Append(prop.Value);
-                    sb.AppendLine();
+                    list.Add($"    {prop.Name}: {prop.Value}\n");
                 }
             }
             else
             {
-                sb.Append(": ");
-                sb.Append(kvp.Value);
-                sb.AppendLine();
+                list.Add($"{kvp.Key}: {kvp.Value}\n");
             }
         }
 
-        sb.Append(message.Payload);
+        return list;
+    }
+
+    string GetCombinedString(List<string> headerLines, List<string> payloadLines)
+    {
+        var sb = new StringBuilder();
+
+        foreach (var line in headerLines)
+            sb.AppendLine(line);
+        foreach (var line in payloadLines)
+            sb.AppendLine(line);
 
         return sb.ToString();
     }
@@ -193,47 +219,10 @@ public partial class Queue
         _lineFilter = s;
     }
 
-    IEnumerable<string> GetFilteredLines(string line)
-    {
-        if (string.IsNullOrWhiteSpace(_lineFilter))
-        {
-            yield return line;
-            yield break;
-        }
-
-        int index = 0;
-        while (true)
-        {
-            var (wholeLine, endIndex) = FindString(line, _lineFilter, index);
-            if (wholeLine != null)
-                yield return wholeLine;
-            
-            if (wholeLine == null || endIndex == line.Length)
-                yield break;
-            
-            index = endIndex;
-        }
-    }
-
-    (string? wholeLine, int endIndex) FindString(string line, string token, int lineStartIndex)
-    {
-        if (line.Length == 0)
-            return default;
-        
-        var index = line.IndexOf(token, lineStartIndex, StringComparison.InvariantCultureIgnoreCase);
-        if (index == -1)
-            return default;
-        
-        // find a start of the string
-        var startIndex = line.LastIndexOf('\n', index);
-        startIndex += 1;
-        
-        // find an end of the string
-        var endIndex = line.IndexOf('\n', index + token.Length);
-        endIndex = endIndex == -1 ? line.Length : endIndex + 1;
-
-        return (line[startIndex .. endIndex], endIndex);
-    }
+    string? FilterLine(string line, string filter) =>
+        line.Contains(filter, StringComparison.InvariantCultureIgnoreCase)
+            ? line
+            : null;
 
     async Task ExportFilteredLines()
     {
@@ -243,34 +232,19 @@ public partial class Queue
         {
             if (_showMessageParts is ShowMessageParts.Headers or ShowMessageParts.Both)
             {
-                foreach (var kvp in messageItem.Message.Headers)
+                foreach (var line in messageItem.HeaderLines)
                 {
-                    if (kvp.Value.ValueKind == JsonValueKind.Object)
-                    {
-                        if (GetFilteredLines($"{kvp.Key}: ").FirstOrDefault() is { } line1)
-                            sb.AppendLine(line1.Trim());
-                        
-                        foreach (var prop in kvp.Value.EnumerateObject())
-                        {
-                            foreach (var line2 in GetFilteredLines($"{prop.Name}: {prop.Value.ToString()}"))
-                            {
-                                sb.AppendLine(line2.Trim());
-                            }
-                        }
-                    }
-                    else
-                    {
-                        if (GetFilteredLines($"{kvp.Key}: {kvp.Value}").FirstOrDefault() is { } line)
-                            sb.AppendLine(line.Trim());
-                    }
+                    if (FilterLine(line, _lineFilter) is { } filteredLine)
+                        sb.AppendLine(filteredLine.Trim());
                 }
             }
         
             if (_showMessageParts is ShowMessageParts.Payload or ShowMessageParts.Both)
             {
-                foreach (var line in GetFilteredLines(messageItem.Message.Payload))
+                foreach (var line in messageItem.PayloadLines)
                 {
-                    sb.AppendLine(line.Trim());
+                    if (FilterLine(line, _lineFilter) is { } filteredLine)
+                        sb.AppendLine(filteredLine.Trim());
                 }
             }
         }
@@ -286,20 +260,23 @@ public partial class Queue
     async Task EditMessage(int messageIndex)
     {
         var index = messageIndex - 1;
-        var message = _messages[index].Message;
+        var message = _messages[index];
         var parameters = new DialogParameters<EditMessageDialog>
         {
             { x => x.QueueId, _queueId!.Value },
-            { x => x.Message, message },
+            { x => x.MessageId, message.MessageId },
+            { x => x.MessagePayload, string.Join("", message.PayloadLines) },
         };
         var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraLarge };
         var dialog = await DialogService.ShowAsync<EditMessageDialog>("Edit message payload", parameters, options);
         var result = await dialog.Result;
         if (!result!.Canceled)
         {
+            var payloadLines = CreatePayloadLines((string)result.Data!);
             _messages[index] = _messages[index] with
             {
-                Message = _messages[index].Message with { Payload = (string)result.Data! }
+                PayloadLines = payloadLines,
+                CombinedString = GetCombinedString(_messages[index].HeaderLines, payloadLines)
             };
         }
     }
