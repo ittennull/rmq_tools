@@ -49,3 +49,9 @@ pub struct SendMessagesRequest {
     pub message_ids: Vec<MessageId>,
     pub destination_queue_name: String,
 }
+
+#[derive(Serialize)]
+pub struct QueueCounters {
+    pub queue_name: String,
+    pub messages: u64,
+}

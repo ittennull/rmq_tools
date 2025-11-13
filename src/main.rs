@@ -4,27 +4,42 @@ mod database;
 mod dtos;
 mod rabbitmq;
 mod types;
+mod rmq_background;
 
+use std::net::SocketAddr;
 use crate::args::Args;
 use crate::database::Database;
 use crate::rabbitmq::Rabbitmq;
 use anyhow::Result;
 use clap::Parser;
+use log::{error, info, LevelFilter};
 use std::path::PathBuf;
+use crate::rmq_background::RmqBackground;
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() {
+    env_logger::builder()
+        .filter_level(LevelFilter::Debug)
+        .format_timestamp(None)
+        .init();
+
+    _ = run().await.inspect_err(|e| error!("{:?}", e));
+}
+
+async fn run() -> Result<()> {
     let args = Args::parse();
     let rmq_client = Rabbitmq::connect(&args.url, &args.vhost).await?;
+    let rmq_client_background = Rabbitmq::connect(&args.url, &args.vhost).await?;
+    let rmq_background = RmqBackground::new(rmq_client_background);
     let connection_info = rmq_client.get_connection_info();
     let database = Database::new(&connection_info.domain, &connection_info.vhost)?;
     let wwwroot_dir = get_wwwroot_directory()?;
 
-    let app = api::build_api(rmq_client, database, wwwroot_dir);
+    let app = api::build_api(rmq_client, database, rmq_background, wwwroot_dir);
 
-    println!("Web interface is on http://localhost:{}", args.port);
+    info!("Web interface is on http://localhost:{}", args.port);
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", args.port)).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
     Ok(())
 }
 

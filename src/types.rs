@@ -1,4 +1,8 @@
 pub mod rmq_types {
+    use rabbitmq_http_client::api::Client;
+
+    pub type RmqClient = Client<String, String, String>;
+    
     pub struct RemoteQueue {
         pub name: String,
         pub message_count: u64,

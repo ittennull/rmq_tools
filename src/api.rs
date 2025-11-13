@@ -7,11 +7,16 @@ use crate::dtos::{
     PeekMessagesQuery, QueueSummary, RmqConnectionInfo, SendMessagesRequest,
 };
 use crate::rabbitmq::Rabbitmq;
+use crate::rmq_background::RmqBackground;
 use anyhow::Result;
-use axum::extract::{Path, Query, State};
+use axum::extract::ws::{WebSocket, WebSocketUpgrade};
+use axum::extract::{ConnectInfo, Path, Query, State};
 use axum::http::HeaderValue;
-use axum::routing::{delete, get, post, put};
+use axum::response::Response;
+use axum::routing::{any, delete, get, post, put};
 use axum::{Json, Router};
+use log::{debug, error};
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
@@ -23,16 +28,18 @@ struct GuardedData {
 }
 
 #[derive(Clone)]
-pub struct AppState {
+struct AppState {
     guarded: Arc<Mutex<GuardedData>>,
     rmq_connection_info: RmqConnectionInfo,
+    rmq_background: RmqBackground,
 }
 
 impl AppState {
-    pub fn new(rabbitmq: Rabbitmq, database: Database) -> Self {
+    fn new(rabbitmq: Rabbitmq, database: Database, rmq_background: RmqBackground) -> Self {
         Self {
             rmq_connection_info: rabbitmq.get_connection_info(),
             guarded: Arc::new(Mutex::new(GuardedData { rabbitmq, database })),
+            rmq_background,
         }
     }
 }
@@ -40,9 +47,10 @@ impl AppState {
 pub fn build_api(
     rmq_client: Rabbitmq,
     database: Database,
+    rmq_background: RmqBackground,
     wwwroot_dir: std::path::PathBuf,
 ) -> Router {
-    let state = AppState::new(rmq_client, database);
+    let state = AppState::new(rmq_client, database, rmq_background);
 
     let mut index_html_path = wwwroot_dir.clone();
     index_html_path.push("index.html");
@@ -68,6 +76,7 @@ pub fn build_api(
                     "/queues/{queue_id}/messages/{message_id}",
                     put(update_message),
                 )
+                .route("/ws", any(ws_handler))
                 .with_state(state)
                 .layer(cors_layer),
         )
@@ -112,7 +121,7 @@ async fn get_messages(
     Ok(Json(messages))
 }
 
-pub async fn send_messages(
+async fn send_messages(
     State(state): State<AppState>,
     Path(queue_id): Path<QueueId>,
     Json(request): Json<SendMessagesRequest>,
@@ -144,7 +153,7 @@ pub async fn send_messages(
     Ok(())
 }
 
-pub async fn delete_messages(
+async fn delete_messages(
     State(state): State<AppState>,
     Path(queue_id): Path<QueueId>,
     Json(request): Json<DeleteMessagesRequest>,
@@ -160,7 +169,7 @@ pub async fn delete_messages(
     Ok(())
 }
 
-pub async fn load_messages_by_queue_name(
+async fn load_messages_by_queue_name(
     State(state): State<AppState>,
     Query(query): Query<LoadMessagesByQueueNameQuery>,
 ) -> Result<Json<LoadMessagesByQueueNameResponse>, ApiError> {
@@ -190,7 +199,7 @@ pub async fn load_messages_by_queue_name(
     Ok(Json(LoadMessagesByQueueNameResponse { queue_id, messages }))
 }
 
-pub async fn peek_messages(
+async fn peek_messages(
     State(state): State<AppState>,
     Query(query): Query<PeekMessagesQuery>,
 ) -> Result<Json<Vec<Message>>, ApiError> {
@@ -212,7 +221,7 @@ pub async fn peek_messages(
     Ok(Json(rmq_messages))
 }
 
-pub async fn update_message(
+async fn update_message(
     State(state): State<AppState>,
     Path((queue_id, message_id)): Path<(QueueId, MessageId)>,
     payload: String,
@@ -225,5 +234,42 @@ pub async fn update_message(
     match changed {
         true => Ok(()),
         false => Err(ApiError::MessageNotFound(message_id)),
+    }
+}
+
+async fn ws_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+) -> Response {
+    return ws.on_upgrade(move |socket| handle_socket(socket, state, addr));
+
+    async fn handle_socket(mut socket: WebSocket, app_state: AppState, addr: SocketAddr) {
+        debug!("Connected to websocket server from {}", addr);
+
+        let mut receiver = app_state.rmq_background.subscribe();
+
+        loop {
+            if receiver.changed().await.is_err() {
+                error!("tokio channel closed");
+                break;
+            }
+
+            debug!("About to push data to websocket {}", addr);
+
+            let json = {
+                let counters = &*receiver.borrow_and_update();
+                serde_json::to_string(counters).unwrap()
+            };
+
+            if socket
+                .send(axum::extract::ws::Message::Text(json.into()))
+                .await
+                .is_err()
+            {
+                debug!("Client disconnected - {}", addr);
+                return;
+            }
+        }
     }
 }

@@ -1,6 +1,7 @@
 use crate::dtos::RmqConnectionInfo;
-use crate::types::rmq_types::RemoteQueue;
+use crate::types::rmq_types::{RemoteQueue, RmqClient};
 use anyhow::{anyhow, Context};
+use log::info;
 use rabbitmq_http_client::api::{Client, HttpClientError};
 use rabbitmq_http_client::requests::shovels::MessageProperties;
 use rabbitmq_http_client::responses::GetMessage;
@@ -9,7 +10,7 @@ use thiserror::Error;
 use url::Url;
 
 pub struct Rabbitmq {
-    client: Client<String, String, String>,
+    client: RmqClient,
     domain: String,
     vhost: String,
 }
@@ -29,7 +30,7 @@ impl Rabbitmq {
         let port = url.port().unwrap_or(443);
         let endpoint = format!("{}://{}:{}{}", url.scheme(), domain, port, url.path());
 
-        println!(
+        info!(
             "Connecting to endpoint '{}' and vhost '{}'",
             endpoint, vhost
         );
