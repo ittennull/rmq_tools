@@ -96,7 +96,8 @@ public partial class Queue
         _loading = true;
         try
         {
-            (_queueId, var messages) = await Api.LoadMessagesToDbAsync(QueueName);
+            var (queueId, messages) = await Api.LoadMessagesToDbAsync(QueueName);
+            _queueId = queueId;
             CreateMessageItems(messages);
             _numberOfRemoteMessages = 0;
             _numberOfMessagesInDb = _messages.Count;
