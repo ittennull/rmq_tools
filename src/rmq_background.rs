@@ -1,7 +1,7 @@
 use crate::dtos::QueueCounters;
 use crate::rabbitmq::Rabbitmq;
 use log::debug;
-use std::sync::{Arc};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::watch::{Receiver, Sender};
 use tokio::sync::{watch, Notify};
@@ -45,6 +45,13 @@ impl RmqBackground {
 }
 
 async fn update_counter(sender: &Sender<Vec<QueueCounters>>, rmq: &Rabbitmq) {
+    debug!("Enter update_counter");
+
+    if sender.receiver_count() == 0 {
+        debug!("Exit update_counter, there are no receivers");
+        return;
+    }
+
     while let Ok(queues) = rmq.list_queues().await {
         let counters = queues
             .into_iter()

@@ -21,7 +21,10 @@ builder.Services.AddMudServices(config =>
     config.SnackbarConfiguration.SnackbarVariant = Variant.Outlined;
 });
 
-var apiServerUrl = builder.HostEnvironment.IsDevelopment() ? "http://localhost:3000" : builder.HostEnvironment.BaseAddress;
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(apiServerUrl) });
+var envUri = new Uri(builder.HostEnvironment.BaseAddress);
+var apiUrl = builder.HostEnvironment.IsDevelopment() ? "http://localhost:3000" : builder.HostEnvironment.BaseAddress;
+var wsUrl = builder.HostEnvironment.IsDevelopment() ? "ws://localhost:3000/api/ws" : $"ws://{envUri.Host}:{envUri.Port}/api/ws";
+builder.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri(apiUrl) });
+builder.Services.AddTransient(_ => new WebsocketApi(new Uri(wsUrl)));
 
 await builder.Build().RunAsync();

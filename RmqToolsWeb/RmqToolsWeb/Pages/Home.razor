@@ -1,6 +1,8 @@
 ﻿@page "/"
 @inject Api Api
+@inject WebsocketApi WebsocketApi
 @inject NavigationManager Navigation
+@implements IAsyncDisposable
 
 <SectionContent SectionName="top-bar">
     @{
@@ -47,11 +49,36 @@
     {
         _queues = await Api.GetQueueSummariesAsync();
         _queues.Sort((x, y) => String.Compare(x.Name, y.Name, StringComparison.Ordinal));
+
+        await StartWebsocket();
+    }
+
+    async Task StartWebsocket()
+    {
+        await WebsocketApi.StartAsync(async queueCounters =>
+        {
+            await InvokeAsync(() =>
+            {
+                for (var index = 0; index < _queues.Count; index++)
+                {
+                    var queueSummary = _queues[index];
+                    if (queueCounters.TryGetValue(queueSummary.Name, out var counter))
+                        _queues[index] = queueSummary with { MessageCountInRmq = counter.Messages };
+                }
+
+                StateHasChanged();
+            });
+        });
     }
 
     private void OnRowClick(DataGridRowClickEventArgs<QueueSummary> obj)
     {
         if (!obj.Item.Exclusive)
             Navigation.NavigateTo($"/{obj.Item.Name}");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await WebsocketApi.DisposeAsync();
     }
 }

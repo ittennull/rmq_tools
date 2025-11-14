@@ -9,12 +9,14 @@ public record LoadMessagesByQueueNameResponse(uint QueueId, List<Message> Messag
 public record Message(uint Id, string Payload, Dictionary<string, JsonElement> Headers);
 public record DeleteMessagesRequest(IEnumerable<uint> MessageIds);
 public record SendMessagesRequest(string DestinationQueueName, IEnumerable<uint> MessageIds);
+public record QueueCounters(string QueueName, int Messages);
 
 
-[JsonSerializable(typeof(RmqConnectionInfo))]
 [JsonSerializable(typeof(List<QueueSummary>))]
-[JsonSerializable(typeof(LoadMessagesByQueueNameResponse))]
 [JsonSerializable(typeof(List<Message>))]
+[JsonSerializable(typeof(List<QueueCounters>))]
+[JsonSerializable(typeof(RmqConnectionInfo))]
+[JsonSerializable(typeof(LoadMessagesByQueueNameResponse))]
 [JsonSerializable(typeof(DeleteMessagesRequest))]
 [JsonSerializable(typeof(SendMessagesRequest))]
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower)]
