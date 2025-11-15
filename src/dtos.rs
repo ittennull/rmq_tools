@@ -8,6 +8,12 @@ pub struct RmqConnectionInfo {
     pub vhost: String,
 }
 
+#[derive(Serialize, Clone)]
+pub struct EnvInfo {
+    pub rmq_connection_info: RmqConnectionInfo,
+    pub importance_level: u8,
+}
+
 #[derive(Serialize)]
 pub struct Message {
     pub id: MessageId,

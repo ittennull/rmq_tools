@@ -12,18 +12,18 @@
 @* Needed for snackbars *@
 <MudSnackbarProvider />
 
-<MudLayout Class="d-flex flex-column">
-    <MudPaper Class="pa-1 ma-0 d-flex flex-row flex-wrap align-center" Elevation="1" Style="@($"background:{Colors.BlueGray.Lighten5};")" Width="100%">
+<MudLayout Class="@_layoutClasses">
+    <MudPaper Class="@_toolBarClasses" Elevation="1" Width="100%">
         <MudIconButton Icon="@Icons.Material.Filled.Home" Color="Color.Inherit" Size="Size.Medium" OnClick="GoHome"/>
         <MudDivider Vertical="true" FlexItem="true" Class="ml-1"/>
 
-        @if (_rmqConnectionInfo != null)
+        @if (_envInfo != null)
         {
             <div class="mx-5">
-                <MudTooltip Text="@_rmqConnectionInfo.Domain">
-                    @(_rmqConnectionInfo.ServerName ?? _rmqConnectionInfo.Domain)
+                <MudTooltip Text="@_envInfo.RmqConnectionInfo.Domain">
+                    @(_envInfo.RmqConnectionInfo.ServerName ?? _envInfo.RmqConnectionInfo.Domain)
                 </MudTooltip>
-                <div>@_rmqConnectionInfo.Vhost</div>
+                <div>@_envInfo.RmqConnectionInfo.Vhost</div>
             </div>
         }
         <MudDivider Vertical="true" FlexItem="true" Class="mr-5"/>
@@ -37,11 +37,25 @@
 </MudLayout>
 
 @code{
-    RmqConnectionInfo? _rmqConnectionInfo;
+    EnvInfo? _envInfo;
+    string _layoutClasses = "d-flex flex-column ";
+    string _toolBarClasses = "pa-1 ma-0 d-flex flex-row flex-wrap align-center ";
 
     protected override async Task OnInitializedAsync()
     {
-        _rmqConnectionInfo = await Api.GetRmqConnectionInfoAsync();
+        _envInfo = await Api.GetEnvInfoAsync();
+        
+        _layoutClasses += _envInfo.ImportanceLevel switch
+        {
+            2 => "rainbow rainbow-animate",
+            _ => ""
+        };
+        
+        _toolBarClasses += _envInfo.ImportanceLevel switch
+        {
+            1 or 2 => "toolbar-importance",
+            _ => "default-toolbar"
+        };
     }
 
     void GoHome()

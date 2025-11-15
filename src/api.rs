@@ -3,8 +3,8 @@ mod api_error;
 use crate::api::api_error::ApiError;
 use crate::database::{Database, MessageId, MessageSelector, QueueId};
 use crate::dtos::{
-    DeleteMessagesRequest, LoadMessagesByQueueNameQuery, LoadMessagesByQueueNameResponse, Message,
-    PeekMessagesQuery, QueueSummary, RmqConnectionInfo, SendMessagesRequest,
+    DeleteMessagesRequest, EnvInfo, LoadMessagesByQueueNameQuery, LoadMessagesByQueueNameResponse,
+    Message, PeekMessagesQuery, QueueSummary, RmqConnectionInfo, SendMessagesRequest,
 };
 use crate::rabbitmq::Rabbitmq;
 use crate::rmq_background::RmqBackground;
@@ -30,7 +30,7 @@ struct GuardedData {
 #[derive(Clone)]
 struct AppState {
     guarded: Arc<Mutex<GuardedData>>,
-    rmq_connection_info: RmqConnectionInfo,
+    env_info: EnvInfo,
     rmq_background: RmqBackground,
 }
 
@@ -38,15 +38,19 @@ impl AppState {
     fn new(
         rabbitmq: Arc<Rabbitmq>,
         rabbitmq_server_name: Option<String>,
+        importance_level: u8,
         database: Database,
         rmq_background: RmqBackground,
     ) -> Self {
         let rmq_connection_info = rabbitmq.get_connection_info();
         Self {
-            rmq_connection_info: RmqConnectionInfo {
-                domain: rmq_connection_info.domain,
-                server_name: rabbitmq_server_name,
-                vhost: rmq_connection_info.vhost,
+            env_info: EnvInfo {
+                rmq_connection_info: RmqConnectionInfo {
+                    domain: rmq_connection_info.domain,
+                    server_name: rabbitmq_server_name,
+                    vhost: rmq_connection_info.vhost,
+                },
+                importance_level,
             },
             guarded: Arc::new(Mutex::new(GuardedData { rabbitmq, database })),
             rmq_background,
@@ -57,11 +61,18 @@ impl AppState {
 pub fn build_api(
     rabbitmq: Arc<Rabbitmq>,
     rabbitmq_server_name: Option<String>,
+    importance_level: u8,
     database: Database,
     rmq_background: RmqBackground,
     wwwroot_dir: std::path::PathBuf,
 ) -> Router {
-    let state = AppState::new(rabbitmq, rabbitmq_server_name, database, rmq_background);
+    let state = AppState::new(
+        rabbitmq,
+        rabbitmq_server_name,
+        importance_level,
+        database,
+        rmq_background,
+    );
 
     let mut index_html_path = wwwroot_dir.clone();
     index_html_path.push("index.html");
@@ -76,7 +87,7 @@ pub fn build_api(
         .nest(
             "/api",
             Router::new()
-                .route("/rmq_connection", get(get_rmq_connection_info))
+                .route("/env_info", get(get_env_info))
                 .route("/queue/load", post(load_messages_by_queue_name))
                 .route("/queue/peek", get(peek_messages))
                 .route("/queues", get(list_queues))
@@ -94,8 +105,8 @@ pub fn build_api(
         .fallback_service(ServeDir::new(wwwroot_dir).fallback(ServeFile::new(index_html_path)))
 }
 
-async fn get_rmq_connection_info(State(state): State<AppState>) -> Json<RmqConnectionInfo> {
-    Json(state.rmq_connection_info)
+async fn get_env_info(State(state): State<AppState>) -> Json<EnvInfo> {
+    Json(state.env_info)
 }
 
 async fn list_queues(State(state): State<AppState>) -> Result<Json<Vec<QueueSummary>>, ApiError> {

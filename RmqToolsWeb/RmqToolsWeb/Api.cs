@@ -43,9 +43,9 @@ public class Api(HttpClient http)
         return (await response.Content.ReadFromJsonAsync<LoadMessagesByQueueNameResponse>(MySourceGenerationContext.Default.LoadMessagesByQueueNameResponse))!;
     }
 
-    public async Task<RmqConnectionInfo> GetRmqConnectionInfoAsync()
+    public async Task<EnvInfo> GetEnvInfoAsync()
     {
-        return (await http.GetFromJsonAsync<RmqConnectionInfo>("/api/rmq_connection", MySourceGenerationContext.Default.RmqConnectionInfo))!;
+        return (await http.GetFromJsonAsync<EnvInfo>("/api/env_info", MySourceGenerationContext.Default.EnvInfo))!;
     }
 
     public async Task SaveMessageAsync(uint queueId, uint messageId, string messagePayload)

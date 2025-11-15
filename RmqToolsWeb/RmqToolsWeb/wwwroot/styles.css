@@ -1,0 +1,97 @@
+.rainbow {
+    --border-size: 0.3rem;
+    /* Color variables */
+    --color-1: red;
+    --color-2: transparent;
+    --color-3: orange;
+    --color-4: transparent;
+    border: var(--border-size) solid transparent;
+    border-right-width: 0;
+
+    /* Paint an image in the border */
+    /* Alternating steps every 10deg: red, transparent, orange, transparent */
+    border-image: conic-gradient(
+            from var(--angle),
+            var(--color-1) 0deg 10deg,
+            var(--color-2) 10deg 20deg,
+            var(--color-3) 20deg 30deg,
+            var(--color-4) 30deg 40deg,
+            var(--color-1) 40deg 50deg,
+            var(--color-2) 50deg 60deg,
+            var(--color-3) 60deg 70deg,
+            var(--color-4) 70deg 80deg,
+            var(--color-1) 80deg 90deg,
+            var(--color-2) 90deg 100deg,
+            var(--color-3) 100deg 110deg,
+            var(--color-4) 110deg 120deg,
+            var(--color-1) 120deg 130deg,
+            var(--color-2) 130deg 140deg,
+            var(--color-3) 140deg 150deg,
+            var(--color-4) 150deg 160deg,
+            var(--color-1) 160deg 170deg,
+            var(--color-2) 170deg 180deg,
+            var(--color-3) 180deg 190deg,
+            var(--color-4) 190deg 200deg,
+            var(--color-1) 200deg 210deg,
+            var(--color-2) 210deg 220deg,
+            var(--color-3) 220deg 230deg,
+            var(--color-4) 230deg 240deg,
+            var(--color-1) 240deg 250deg,
+            var(--color-2) 250deg 260deg,
+            var(--color-3) 260deg 270deg,
+            var(--color-4) 270deg 280deg,
+            var(--color-1) 280deg 290deg,
+            var(--color-2) 290deg 300deg,
+            var(--color-3) 300deg 310deg,
+            var(--color-4) 310deg 320deg,
+            var(--color-1) 320deg 330deg,
+            var(--color-2) 330deg 340deg,
+            var(--color-3) 340deg 350deg,
+            var(--color-4) 350deg 360deg
+    )
+    1 stretch;
+    background: rgb(255 255 255 / var(--opacity));
+}
+
+.rainbow-animate {
+    animation: rotate 90s linear infinite, opacityChange 3s infinite alternate;
+}
+
+@property --opacity {
+    syntax: "<number>";
+    initial-value: 0;
+    inherits: false;
+}
+
+@property --angle {
+    syntax: "<angle>";
+    initial-value: 0deg;
+    inherits: false;
+}
+
+@keyframes opacityChange {
+    to {
+        --opacity: 1;
+    }
+}
+
+@keyframes rotate {
+    to {
+        --angle: 360deg;
+    }
+}
+
+.toolbar-importance{
+    background: radial-gradient(circle,
+        rgba(255, 165, 0, 0.5) 0%,
+        rgba(253, 29, 29, 0.2) 50%,
+        rgba(252, 176, 69, 0.2) 100%
+    );
+}
+
+.default-toolbar{
+    background: gainsboro;
+    border-width: 1px;
+    border-color: midnightblue;
+    border-radius: 10px;
+}

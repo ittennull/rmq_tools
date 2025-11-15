@@ -19,4 +19,7 @@ pub struct Args {
 
     #[arg(long, help = "RabbitMQ server name to display in UI. By default it shows the host taken from url argument")]
     pub server_name: Option<String>,
+
+    #[arg(long, default_value_t = 0, help = "Adds to UI a visual indication of how important the data on the connected server is. Values from 0 to 2")]
+    pub importance_level: u8,
 }
