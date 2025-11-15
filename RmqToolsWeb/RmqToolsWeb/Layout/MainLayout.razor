@@ -20,7 +20,9 @@
         @if (_rmqConnectionInfo != null)
         {
             <div class="mx-5">
-                <div>@_rmqConnectionInfo.Domain</div>
+                <MudTooltip Text="@_rmqConnectionInfo.Domain">
+                    @(_rmqConnectionInfo.ServerName ?? _rmqConnectionInfo.Domain)
+                </MudTooltip>
                 <div>@_rmqConnectionInfo.Vhost</div>
             </div>
         }

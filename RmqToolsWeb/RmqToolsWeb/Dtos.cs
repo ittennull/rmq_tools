@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace RmqToolsWeb;
 
-public record RmqConnectionInfo(string Domain, string Vhost);
+public record RmqConnectionInfo(string Domain, string? ServerName, string Vhost);
 public record QueueSummary(uint? QueueId, string Name, bool Exclusive, int MessageCountInRmq, int? MessageCountInDb);
 public record LoadMessagesByQueueNameResponse(uint QueueId, List<Message> Messages);
 public record Message(uint Id, string Payload, Dictionary<string, JsonElement> Headers);

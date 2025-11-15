@@ -36,7 +36,7 @@ async fn run() -> Result<()> {
     let database = Database::new(&connection_info.domain, &connection_info.vhost)?;
     let wwwroot_dir = get_wwwroot_directory()?;
 
-    let app = api::build_api(rmq_client, database, rmq_background, wwwroot_dir);
+    let app = api::build_api(rmq_client, args.server_name, database, rmq_background, wwwroot_dir);
 
     info!("Web interface is on http://localhost:{}", args.port);
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", args.port)).await?;

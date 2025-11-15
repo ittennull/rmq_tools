@@ -8,6 +8,11 @@ pub mod rmq_types {
         pub message_count: u64,
         pub exclusive: bool,
     }
+
+    pub struct RmqConnectionInfo {
+        pub domain: String,
+        pub vhost: String,
+    }
 }
 
 pub mod db_types{

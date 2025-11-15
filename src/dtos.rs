@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Clone)]
 pub struct RmqConnectionInfo {
     pub domain: String,
+    pub server_name: Option<String>,
     pub vhost: String,
 }
 

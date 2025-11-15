@@ -35,9 +35,19 @@ struct AppState {
 }
 
 impl AppState {
-    fn new(rabbitmq: Arc<Rabbitmq>, database: Database, rmq_background: RmqBackground) -> Self {
+    fn new(
+        rabbitmq: Arc<Rabbitmq>,
+        rabbitmq_server_name: Option<String>,
+        database: Database,
+        rmq_background: RmqBackground,
+    ) -> Self {
+        let rmq_connection_info = rabbitmq.get_connection_info();
         Self {
-            rmq_connection_info: rabbitmq.get_connection_info(),
+            rmq_connection_info: RmqConnectionInfo {
+                domain: rmq_connection_info.domain,
+                server_name: rabbitmq_server_name,
+                vhost: rmq_connection_info.vhost,
+            },
             guarded: Arc::new(Mutex::new(GuardedData { rabbitmq, database })),
             rmq_background,
         }
@@ -45,12 +55,13 @@ impl AppState {
 }
 
 pub fn build_api(
-    rmq_client: Arc<Rabbitmq>,
+    rabbitmq: Arc<Rabbitmq>,
+    rabbitmq_server_name: Option<String>,
     database: Database,
     rmq_background: RmqBackground,
     wwwroot_dir: std::path::PathBuf,
 ) -> Router {
-    let state = AppState::new(rmq_client, database, rmq_background);
+    let state = AppState::new(rabbitmq, rabbitmq_server_name, database, rmq_background);
 
     let mut index_html_path = wwwroot_dir.clone();
     index_html_path.push("index.html");
