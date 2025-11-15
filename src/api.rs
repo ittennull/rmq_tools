@@ -23,7 +23,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 
 struct GuardedData {
-    rabbitmq: Rabbitmq,
+    rabbitmq: Arc<Rabbitmq>,
     database: Database,
 }
 
@@ -35,7 +35,7 @@ struct AppState {
 }
 
 impl AppState {
-    fn new(rabbitmq: Rabbitmq, database: Database, rmq_background: RmqBackground) -> Self {
+    fn new(rabbitmq: Arc<Rabbitmq>, database: Database, rmq_background: RmqBackground) -> Self {
         Self {
             rmq_connection_info: rabbitmq.get_connection_info(),
             guarded: Arc::new(Mutex::new(GuardedData { rabbitmq, database })),
@@ -45,7 +45,7 @@ impl AppState {
 }
 
 pub fn build_api(
-    rmq_client: Rabbitmq,
+    rmq_client: Arc<Rabbitmq>,
     database: Database,
     rmq_background: RmqBackground,
     wwwroot_dir: std::path::PathBuf,

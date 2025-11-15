@@ -14,7 +14,7 @@ pub struct RmqBackground {
 }
 
 impl RmqBackground {
-    pub fn new(rmq: Rabbitmq) -> RmqBackground {
+    pub fn new(rmq: Arc<Rabbitmq>) -> RmqBackground {
         let notify_worker = Arc::new(Notify::new());
         let (sender, _) = watch::channel(vec![]);
 

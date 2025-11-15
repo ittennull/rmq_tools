@@ -3,24 +3,26 @@ mod args;
 mod database;
 mod dtos;
 mod rabbitmq;
-mod types;
 mod rmq_background;
+mod types;
 
-use std::net::SocketAddr;
 use crate::args::Args;
 use crate::database::Database;
 use crate::rabbitmq::Rabbitmq;
+use crate::rmq_background::RmqBackground;
 use anyhow::Result;
 use clap::Parser;
 use log::{error, info, LevelFilter};
+use std::net::SocketAddr;
 use std::path::PathBuf;
-use crate::rmq_background::RmqBackground;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
     env_logger::builder()
-        .filter_level(LevelFilter::Debug)
+        .filter_level(LevelFilter::Info)
         .format_timestamp(None)
+        .format_target(false)
         .init();
 
     _ = run().await.inspect_err(|e| error!("{:?}", e));
@@ -28,9 +30,8 @@ async fn main() {
 
 async fn run() -> Result<()> {
     let args = Args::parse();
-    let rmq_client = Rabbitmq::connect(&args.url, &args.vhost).await?;
-    let rmq_client_background = Rabbitmq::connect(&args.url, &args.vhost).await?;
-    let rmq_background = RmqBackground::new(rmq_client_background);
+    let rmq_client = Arc::new(Rabbitmq::connect(&args.url, &args.vhost).await?);
+    let rmq_background = RmqBackground::new(Arc::clone(&rmq_client));
     let connection_info = rmq_client.get_connection_info();
     let database = Database::new(&connection_info.domain, &connection_info.vhost)?;
     let wwwroot_dir = get_wwwroot_directory()?;
@@ -39,7 +40,12 @@ async fn run() -> Result<()> {
 
     info!("Web interface is on http://localhost:{}", args.port);
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", args.port)).await?;
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
+
     Ok(())
 }
 
