@@ -11,6 +11,7 @@
     <!-- Important: Increment the version parameter whenever you update MudBlazor to prevent caching issues -->
     <link href="_content/MudBlazor/MudBlazor.min.css?v=1" rel="stylesheet" />
 <!--    <link href="RmqToolsWeb.styles.css" rel="stylesheet" />-->
+    <script type="importmap"></script>
 </head>
 
 <body style="height: 100%;">
@@ -24,8 +25,8 @@
         <a href="." class="reload">Reload</a>
         <span class="dismiss">🗙</span>
     </div>
-    <script src="_content/MudBlazor/MudBlazor.min.js?v=1"></script>
-    <script src="_framework/blazor.webassembly.js"></script>
+    <script src="_content/MudBlazor/MudBlazor#[.{fingerprint}].min.js"></script>
+    <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
 </body>
 
 </html>
