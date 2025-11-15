@@ -2,6 +2,7 @@
 @inject Api Api
 @inject WebsocketApi WebsocketApi
 @inject NavigationManager Navigation
+@inject HomeGridFilters GridFilters
 @implements IAsyncDisposable
 
 <SectionContent SectionName="top-bar">
@@ -22,14 +23,15 @@
 
 <PageTitle>Queues</PageTitle>
 
-<MudDataGrid Items="@_queues" Dense="true" Hover="true" RowClick="@((DataGridRowClickEventArgs<QueueSummary> x) => OnRowClick(x))" 
+<MudDataGrid @ref="_dataGrid" Items="@_queues" Dense="true" Hover="true" RowClick="@((DataGridRowClickEventArgs<QueueSummary> x) => OnRowClick(x))" 
              RowClass="cursor-pointer" 
              Filterable="true" FilterMode="DataGridFilterMode.ColumnFilterRow" FilterCaseSensitivity="DataGridFilterCaseSensitivity.CaseInsensitive">
     <Columns>
-        <PropertyColumn Property="x => x.Name" Title="Queue" />
-        <PropertyColumn Property="x => x.MessageCountInRmq" Title="Message count in RMQ" 
+        <PropertyColumn @ref="_nameColumn" Property="x => x.Name" Title="Queue"
+                        FilterOperators="@([FilterOperator.String.Contains, FilterOperator.String.NotContains, FilterOperator.String.Equal, FilterOperator.String.StartsWith, FilterOperator.String.EndsWith])"/>
+        <PropertyColumn @ref="_messagesInRmqColumn" Property="x => x.MessageCountInRmq" Title="Message count in RMQ" 
                         FilterOperators="@([FilterOperator.Number.GreaterThanOrEqual, FilterOperator.Number.Equal, FilterOperator.Number.LessThanOrEqual])" />
-        <PropertyColumn Property="x => x.MessageCountInDb" Title="Message count in DB"
+        <PropertyColumn @ref="_messagesInDbColumn" Property="x => x.MessageCountInDb" Title="Message count in DB"
                         FilterOperators="@([FilterOperator.Number.GreaterThanOrEqual, FilterOperator.Number.Equal, FilterOperator.Number.LessThanOrEqual])">
             <CellTemplate>@(context.Item.MessageCountInDb > 0 ? context.Item.MessageCountInDb.ToString() : "")</CellTemplate>
         </PropertyColumn>
@@ -48,16 +50,44 @@
 
 @code
 {
-    List<QueueSummary> _queues = [];
+    public record HomeGridFilter(string PropertyName, string Operator, object Value);
+    public record HomeGridFilters(List<HomeGridFilter> Filters);
     
+    List<QueueSummary> _queues = [];
+    MudDataGrid<QueueSummary> _dataGrid = null!;
+    PropertyColumn<QueueSummary, string> _nameColumn = null!;
+    PropertyColumn<QueueSummary, int> _messagesInRmqColumn = null!;
+    PropertyColumn<QueueSummary, int> _messagesInDbColumn = null!;
+
     protected override async Task OnInitializedAsync()
     {
         _queues = await Api.GetQueueSummariesAsync();
         _queues.Sort((x, y) => String.Compare(x.Name, y.Name, StringComparison.Ordinal));
 
+        await RestoreGridFilters();
         await StartWebsocket();
+     
+        Navigation.LocationChanged += OnLocationChanged;
     }
 
+    async Task RestoreGridFilters()
+    {
+        foreach (var filter in GridFilters.Filters)
+        {
+            var filterDefinition = filter.PropertyName switch
+            {
+                nameof(QueueSummary.Name) => _nameColumn.FilterContext.FilterDefinition,
+                nameof(QueueSummary.MessageCountInRmq) => _messagesInRmqColumn.FilterContext.FilterDefinition,
+                nameof(QueueSummary.MessageCountInDb) => _messagesInDbColumn.FilterContext.FilterDefinition,
+                _ => throw new ArgumentOutOfRangeException(nameof(filter.PropertyName))
+            };
+            
+            filterDefinition!.Value = filter.Value;
+            filterDefinition.Operator = filter.Operator;
+            await _dataGrid.AddFilterAsync(filterDefinition);
+        }
+    }
+    
     async Task StartWebsocket()
     {
         await WebsocketApi.StartAsync(async queueCounters =>
@@ -76,6 +106,17 @@
         });
     }
 
+    void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        GridFilters.Filters.Clear();
+
+        foreach (var filterDefinition in _dataGrid.FilterDefinitions)
+        {
+            if (filterDefinition.Operator != null)
+                GridFilters.Filters.Add(new HomeGridFilter(filterDefinition.Column!.PropertyName, filterDefinition.Operator, filterDefinition.Value!));
+        }
+    }
+    
     private void OnRowClick(DataGridRowClickEventArgs<QueueSummary> obj)
     {
         if (!obj.Item.Exclusive)
@@ -84,6 +125,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        Navigation.LocationChanged -= OnLocationChanged;
         await WebsocketApi.DisposeAsync();
     }
 }

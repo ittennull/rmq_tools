@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MudBlazor;
 using MudBlazor.Services;
 using RmqToolsWeb;
+using RmqToolsWeb.Pages;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
@@ -20,6 +21,8 @@ builder.Services.AddMudServices(config =>
     config.SnackbarConfiguration.ShowTransitionDuration = 500;
     config.SnackbarConfiguration.SnackbarVariant = Variant.Outlined;
 });
+
+builder.Services.AddSingleton(new Home.HomeGridFilters([]));
 
 var envUri = new Uri(builder.HostEnvironment.BaseAddress);
 var apiUrl = builder.HostEnvironment.IsDevelopment() ? "http://localhost:3000" : builder.HostEnvironment.BaseAddress;
