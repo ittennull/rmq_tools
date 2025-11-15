@@ -20,8 +20,8 @@
 @code {
     [Parameter] public uint QueueId { get; set; }
     [Parameter] public uint MessageId { get; set; }
-    [Parameter] public string MessagePayload { get; set; }
-    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; }
+    [Parameter] public required string MessagePayload { get; set; }
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = null!;
 
     string _payload = string.Empty;
     bool? _isValidJson;

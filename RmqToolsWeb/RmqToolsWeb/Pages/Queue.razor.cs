@@ -6,7 +6,7 @@ using RmqToolsWeb.Components;
 
 namespace RmqToolsWeb.Pages;
 
-public partial class Queue
+public partial class Queue : IAsyncDisposable
 {
     enum ShowMessageParts { Both, Headers, Payload }
     
@@ -14,15 +14,17 @@ public partial class Queue
     
     [Parameter]
     public required string QueueName { get; set; }
-    
-    [Inject] Api Api { get; set; }
-    [Inject] IDialogService DialogService { get; set; }
+
+    [Inject] Api Api { get; set; } = null!;
+    [Inject] IDialogService DialogService { get; set; } = null!;
+    [Inject] WebsocketApi WebsocketApi { get; set; } = null!;
 
     bool _loading = true;
     readonly List<MessageItem> _messages = [];
     HashSet<MessageItem> _selectedMessages = [];
     string _moveToQueue = "";
     string[] _queueNames = [];
+    bool _numberOfRemoteMessagesIsOutOfDate;
     int _numberOfRemoteMessages;
     int _numberOfMessagesInDb;
     uint? _queueId;
@@ -31,7 +33,7 @@ public partial class Queue
     bool? _readonlyMode;
     string _groupBySelector = "";
     Func<MessageItem, object>? _groupBy;
-    MudDataGrid<MessageItem> _dataGrid;
+    MudDataGrid<MessageItem> _dataGrid = null!;
 
     bool CanSendOrDeleteMessages => _queueId != null && _messages.Count != 0;
     bool GroupingEnabled => _groupBySelector != string.Empty;
@@ -87,8 +89,23 @@ public partial class Queue
                 CreateMessageItems(messages);
             }
         }
+
+        await StartWebsocket();
         
         _loading = false;
+    }
+    
+    async Task StartWebsocket()
+    {
+        await WebsocketApi.StartAsync(async queueCounters =>
+        {
+            await InvokeAsync(() =>
+            {
+                _numberOfRemoteMessages = queueCounters.SingleOrDefault(x => x.Key == QueueName).Value?.Messages ?? 0;
+                _numberOfRemoteMessagesIsOutOfDate = false;
+                StateHasChanged();
+            });
+        });
     }
 
     async Task LoadMessages()
@@ -100,6 +117,7 @@ public partial class Queue
             _queueId = queueId;
             CreateMessageItems(messages);
             _numberOfRemoteMessages = 0;
+            _numberOfRemoteMessagesIsOutOfDate = false;
             _numberOfMessagesInDb = _messages.Count;
             _readonlyMode = false;
         }
@@ -138,7 +156,7 @@ public partial class Queue
         await Api.SendMessagesToQueueAsync(_queueId!.Value, messageIds, _moveToQueue);
 
         if (_moveToQueue == QueueName)
-            _numberOfRemoteMessages += _selectedMessages.Count == 0 ? _messages.Count : _selectedMessages.Count;
+            _numberOfRemoteMessagesIsOutOfDate = true;
         
         ClearMessagesAfterOperation();
         
@@ -288,5 +306,10 @@ public partial class Queue
         {
             _dataGrid.SelectedItems.Add(messageItem);
         }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        return WebsocketApi.DisposeAsync();
     }
 }

@@ -1,12 +1,11 @@
 ﻿@page "/{queueName}"
-@using System.Text.Json
 
 <SectionContent SectionName="top-bar">
     <MudStack Spacing="5" Row="true">
         <div>
             <div><b>@QueueName</b></div>
             <div>
-                <MudText Inline="true" Color="Color.Info">@_numberOfRemoteMessages</MudText> @MessageWord(_numberOfRemoteMessages) in RMQ
+                <MudText Inline="true" Color="@(_numberOfRemoteMessagesIsOutOfDate ? Color.Warning : Color.Info)">@_numberOfRemoteMessages</MudText> @MessageWord(_numberOfRemoteMessages) in RMQ
                  • 
                 <MudText Inline="true" Color="Color.Info">@(_numberOfMessagesInDb)</MudText> @MessageWord(_numberOfMessagesInDb) in DB
             </div>

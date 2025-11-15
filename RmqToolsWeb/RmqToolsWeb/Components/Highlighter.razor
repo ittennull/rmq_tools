@@ -3,8 +3,8 @@
 @((MarkupString)_highlightedText)
 
 @code {
-    [Parameter] public string Text { get; set; }
-    [Parameter] public string Token { get; set; }
+    [Parameter] public required string Text { get; set; }
+    [Parameter] public required string Token { get; set; }
     
     string _highlightedText = string.Empty;
 
