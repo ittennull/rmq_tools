@@ -123,7 +123,7 @@ async fn list_queues(State(state): State<AppState>) -> Result<Json<Vec<QueueSumm
                 queue_id: local_queue.map(|x| x.id),
                 name: remote_queue.name,
                 message_count_in_rmq: remote_queue.message_count,
-                message_count_in_db: local_queue.map(|x| x.message_count),
+                message_count_in_db: local_queue.map(|x| x.message_count).unwrap_or(0),
                 exclusive: remote_queue.exclusive,
             }
         })

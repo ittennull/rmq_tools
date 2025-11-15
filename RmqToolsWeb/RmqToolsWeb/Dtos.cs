@@ -5,7 +5,7 @@ namespace RmqToolsWeb;
 
 public record RmqConnectionInfo(string Domain, string? ServerName, string Vhost);
 public record EnvInfo(RmqConnectionInfo RmqConnectionInfo, int ImportanceLevel);
-public record QueueSummary(uint? QueueId, string Name, bool Exclusive, int MessageCountInRmq, int? MessageCountInDb);
+public record QueueSummary(uint? QueueId, string Name, bool Exclusive, int MessageCountInRmq, int MessageCountInDb);
 public record LoadMessagesByQueueNameResponse(uint QueueId, List<Message> Messages);
 public record Message(uint Id, string Payload, Dictionary<string, JsonElement> Headers);
 public record DeleteMessagesRequest(IEnumerable<uint> MessageIds);

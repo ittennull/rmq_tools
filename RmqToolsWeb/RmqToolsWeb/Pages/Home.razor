@@ -23,12 +23,17 @@
 <PageTitle>Queues</PageTitle>
 
 <MudDataGrid Items="@_queues" Dense="true" Hover="true" RowClick="@((DataGridRowClickEventArgs<QueueSummary> x) => OnRowClick(x))" 
-             RowClass="cursor-pointer"
+             RowClass="cursor-pointer" 
              Filterable="true" FilterMode="DataGridFilterMode.ColumnFilterRow" FilterCaseSensitivity="DataGridFilterCaseSensitivity.CaseInsensitive">
     <Columns>
         <PropertyColumn Property="x => x.Name" Title="Queue" />
-        <PropertyColumn Property="x => x.MessageCountInRmq" Title="Message count in RMQ"/>
-        <PropertyColumn Property="x => x.MessageCountInDb" Title="Message count in DB"/>
+        <PropertyColumn Property="x => x.MessageCountInRmq" Title="Message count in RMQ" 
+                        FilterOperators="@([FilterOperator.Number.GreaterThanOrEqual, FilterOperator.Number.Equal, FilterOperator.Number.LessThanOrEqual])" />
+        <PropertyColumn Property="x => x.MessageCountInDb" Title="Message count in DB"
+                        FilterOperators="@([FilterOperator.Number.GreaterThanOrEqual, FilterOperator.Number.Equal, FilterOperator.Number.LessThanOrEqual])">
+            <CellTemplate>@(context.Item.MessageCountInDb > 0 ? context.Item.MessageCountInDb.ToString() : "")</CellTemplate>
+        </PropertyColumn>
+        
         <TemplateColumn Title="Exclusive" Filterable="false">
             <CellTemplate>
                 @if (context.Item.Exclusive)
