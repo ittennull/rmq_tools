@@ -172,22 +172,23 @@ impl Database {
         Ok(())
     }
 
-    fn delete_messages_by_ids(&self, ids: &[MessageId]) -> Result<(), DatabaseError> {
+    fn delete_messages_by_ids(&self, ids: &[MessageId]) -> Result<usize, DatabaseError> {
         let vars = repeat_vars(ids.len());
-        self.connection.execute(
+        let deleted = self.connection.execute(
             &format!("DELETE FROM messages WHERE id IN ({vars})"),
             rusqlite::params_from_iter(ids),
         )?;
-        Ok(())
+        Ok(deleted)
     }
 
-    fn delete_all_messages(&self, queue_id: QueueId) -> Result<(), DatabaseError> {
-        self.connection
+    fn delete_all_messages(&self, queue_id: QueueId) -> Result<usize, DatabaseError> {
+        let deleted = self
+            .connection
             .execute("DELETE FROM messages WHERE queue_id=?", [queue_id])?;
-        Ok(())
+        Ok(deleted)
     }
 
-    pub fn delete_messages(&self, selector: &MessageSelector) -> Result<(), DatabaseError> {
+    pub fn delete_messages(&self, selector: &MessageSelector) -> Result<usize, DatabaseError> {
         match selector {
             MessageSelector::AllInQueue(queue_id) => self.delete_all_messages(*queue_id),
             MessageSelector::WithIds(ids) => self.delete_messages_by_ids(ids),

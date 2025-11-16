@@ -15,7 +15,7 @@ use axum::http::HeaderValue;
 use axum::response::Response;
 use axum::routing::{any, delete, get, post, put};
 use axum::{Json, Router};
-use log::{debug, error};
+use log::{debug, error, info};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -156,6 +156,7 @@ async fn send_messages(
         ids => MessageSelector::WithIds(ids),
     };
     let messages = guarded.database.get_messages(&message_selector)?;
+    let messages_len = messages.len();
 
     // publish messages
     for message in messages.into_iter() {
@@ -172,6 +173,11 @@ async fn send_messages(
     // delete messages
     guarded.database.delete_messages(&message_selector)?;
 
+    info!(
+        "Sent {} messages to queue {}",
+        messages_len, request.destination_queue_name
+    );
+
     Ok(())
 }
 
@@ -186,7 +192,9 @@ async fn delete_messages(
     };
 
     let guarded = state.guarded.lock().await;
-    guarded.database.delete_messages(&message_selector)?;
+    let deleted = guarded.database.delete_messages(&message_selector)?;
+
+    info!("Deleted {} messages", deleted);
 
     Ok(())
 }
@@ -212,6 +220,11 @@ async fn load_messages_by_queue_name(
 
     if !rmq_messages.is_empty() {
         guarded.database.save_messages(queue_id, &rmq_messages)?;
+        info!(
+            "Loaded {} messages to database from queue {}",
+            rmq_messages.len(),
+            query.queue_name
+        );
     }
 
     let messages = guarded
@@ -252,6 +265,10 @@ async fn update_message(
     let changed = guarded
         .database
         .set_message_payload(queue_id, message_id, &payload)?;
+
+    if changed {
+        info!("Updated message {}", message_id);
+    }
 
     match changed {
         true => Ok(()),
