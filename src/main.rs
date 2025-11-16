@@ -45,7 +45,7 @@ async fn run() -> Result<()> {
         wwwroot_dir,
     );
 
-    info!("Web interface is on http://localhost:{}", args.port);
+    info!("Web interface is on http://rmq-tools.localhost:{}", args.port);
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", args.port)).await?;
     axum::serve(
         listener,
