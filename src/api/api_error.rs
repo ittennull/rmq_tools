@@ -2,6 +2,7 @@ use crate::database::{DatabaseError, MessageId};
 use crate::rabbitmq::RabbitMQError;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use log::error;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -22,6 +23,11 @@ impl IntoResponse for ApiError {
             ApiError::MessageNotFound(_) => StatusCode::NOT_FOUND,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
+
+        if status_code == StatusCode::INTERNAL_SERVER_ERROR {
+            error!("{}", self);
+        }
+
         (status_code, self.to_string()).into_response()
     }
 }
