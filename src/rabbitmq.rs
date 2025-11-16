@@ -1,4 +1,4 @@
-use crate::types::rmq_types::{RmqConnectionInfo, RemoteQueue, RmqClient};
+use crate::types::rmq_types::{RemoteQueue, RmqClient, RmqConnectionInfo};
 use anyhow::{anyhow, Context};
 use log::info;
 use rabbitmq_http_client::api::{Client, HttpClientError};
@@ -12,6 +12,7 @@ pub struct Rabbitmq {
     client: RmqClient,
     domain: String,
     vhost: String,
+    show_exclusive_queues: bool,
 }
 
 #[derive(Error, Debug)]
@@ -23,7 +24,11 @@ pub enum RabbitMQError {
 }
 
 impl Rabbitmq {
-    pub async fn connect(url: &str, vhost: &str) -> Result<Self, anyhow::Error> {
+    pub async fn connect(
+        url: &str,
+        vhost: &str,
+        show_exclusive_queues: bool,
+    ) -> Result<Self, anyhow::Error> {
         let url = Url::parse(url)?;
         let domain = url.domain().expect("Domain is missing").to_string();
         let port = url.port().unwrap_or(443);
@@ -49,6 +54,7 @@ impl Rabbitmq {
             client,
             domain,
             vhost: vhost.to_string(),
+            show_exclusive_queues,
         })
     }
 
@@ -65,6 +71,7 @@ impl Rabbitmq {
             .list_queues_in(&self.vhost)
             .await?
             .into_iter()
+            .filter(|x| self.show_exclusive_queues || !x.exclusive)
             .map(|q| RemoteQueue {
                 name: q.name,
                 message_count: q.message_count,

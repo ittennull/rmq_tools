@@ -30,7 +30,8 @@ async fn main() {
 
 async fn run() -> Result<()> {
     let args = Args::parse();
-    let rmq_client = Arc::new(Rabbitmq::connect(&args.url, &args.vhost).await?);
+    let rmq_client =
+        Arc::new(Rabbitmq::connect(&args.url, &args.vhost, args.show_exclusive_queues).await?);
     let rmq_background = RmqBackground::new(Arc::clone(&rmq_client));
     let connection_info = rmq_client.get_connection_info();
     let database = Database::new(&connection_info.domain, &connection_info.vhost)?;
@@ -45,7 +46,10 @@ async fn run() -> Result<()> {
         wwwroot_dir,
     );
 
-    info!("Web interface is on http://rmq-tools.localhost:{}", args.port);
+    info!(
+        "Web interface is on http://rmq-tools.localhost:{}",
+        args.port
+    );
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", args.port)).await?;
     axum::serve(
         listener,

@@ -28,22 +28,21 @@
              Filterable="true" FilterMode="DataGridFilterMode.ColumnFilterRow" FilterCaseSensitivity="DataGridFilterCaseSensitivity.CaseInsensitive">
     <Columns>
         <PropertyColumn @ref="_nameColumn" Property="x => x.Name" Title="Queue"
-                        FilterOperators="@([FilterOperator.String.Contains, FilterOperator.String.NotContains, FilterOperator.String.Equal, FilterOperator.String.StartsWith, FilterOperator.String.EndsWith])"/>
+                        FilterOperators="@([FilterOperator.String.Contains, FilterOperator.String.NotContains, FilterOperator.String.Equal, FilterOperator.String.StartsWith, FilterOperator.String.EndsWith])">
+            <CellTemplate>
+                @context.Item.Name
+                @if (context.Item.Exclusive)
+                {
+                    <MudChip T="string" Variant="Variant.Text" Size="Size.Small" Class="ml-2" Color="Color.Secondary">exclusive</MudChip>
+                }
+            </CellTemplate>
+        </PropertyColumn>
         <PropertyColumn @ref="_messagesInRmqColumn" Property="x => x.MessageCountInRmq" Title="Message count in RMQ" 
                         FilterOperators="@([FilterOperator.Number.GreaterThanOrEqual, FilterOperator.Number.Equal, FilterOperator.Number.LessThanOrEqual])" />
         <PropertyColumn @ref="_messagesInDbColumn" Property="x => x.MessageCountInDb" Title="Message count in DB"
                         FilterOperators="@([FilterOperator.Number.GreaterThanOrEqual, FilterOperator.Number.Equal, FilterOperator.Number.LessThanOrEqual])">
             <CellTemplate>@(context.Item.MessageCountInDb > 0 ? context.Item.MessageCountInDb.ToString() : "")</CellTemplate>
         </PropertyColumn>
-        
-        <TemplateColumn Title="Exclusive" Filterable="false">
-            <CellTemplate>
-                @if (context.Item.Exclusive)
-                {
-                    <MudChip T="string" Variant="Variant.Text" Color="Color.Secondary">exclusive</MudChip>
-                }
-            </CellTemplate>
-        </TemplateColumn>
     </Columns>
 </MudDataGrid>
 
