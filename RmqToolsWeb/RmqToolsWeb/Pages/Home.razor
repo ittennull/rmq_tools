@@ -94,6 +94,9 @@
         {
             await InvokeAsync(() =>
             {
+                // delete queues that were deleted on the server
+                _queues.RemoveAll(x => !queueCounters.ContainsKey(x.Name));
+                // update the counters for the other queues
                 for (var index = 0; index < _queues.Count; index++)
                 {
                     var queueSummary = _queues[index];
