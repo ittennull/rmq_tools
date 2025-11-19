@@ -5,6 +5,7 @@ mod dtos;
 mod rabbitmq;
 mod rmq_background;
 mod types;
+mod check_version;
 
 use crate::args::Args;
 use crate::database::Database;
@@ -16,6 +17,7 @@ use log::{error, info, LevelFilter};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use crate::check_version::show_notification_if_new_version_available;
 
 #[tokio::main]
 async fn main() {
@@ -30,6 +32,8 @@ async fn main() {
 
 async fn run() -> Result<()> {
     let args = Args::parse();
+    show_notification_if_new_version_available().await;
+
     let rmq_client =
         Arc::new(Rabbitmq::connect(&args.url, &args.vhost, args.show_exclusive_queues).await?);
     let rmq_background = RmqBackground::new(Arc::clone(&rmq_client));
