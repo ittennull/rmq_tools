@@ -87,7 +87,7 @@
                 </div>
             </CellTemplate>
         </PropertyColumn>
-        <PropertyColumn Property="x => x.CombinedString" Title="Message" Groupable="@GroupingEnabled" GroupBy="@_groupBy" Grouping="@GroupingEnabled">
+        <PropertyColumn Property="x => x.CombinedString" Title="Message" Groupable="@GroupingEnabled" GroupBy="@(x => GroupMessagesBy(x))" Grouping="@GroupingEnabled">
             <GroupTemplate>
                 <MudButton Color="Color.Default" Variant="Variant.Outlined" Class="mx-3" Size="Size.Small" OnClick="@(() => SelectAllInGroup(context.Grouping!))">Select</MudButton>
                 <b>@(context.Grouping.Count())</b> : @(context.Grouping.Key)

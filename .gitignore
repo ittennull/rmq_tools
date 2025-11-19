@@ -8,3 +8,6 @@ obj
 
 # sqlite
 *.db
+
+# misc
+*.user

@@ -32,7 +32,6 @@ public partial class Queue : IAsyncDisposable
     string _lineFilter = "";
     bool? _readonlyMode;
     string _groupBySelector = "";
-    Func<MessageItem, object>? _groupBy;
     MudDataGrid<MessageItem> _dataGrid = null!;
 
     bool CanSendOrDeleteMessages => _queueId != null && _messages.Count != 0;
@@ -41,22 +40,6 @@ public partial class Queue : IAsyncDisposable
     protected override async Task OnInitializedAsync()
     {
         _moveToQueue = QueueName;
-
-        _groupBy = x =>
-        {
-            foreach (var line in x.HeaderLines)
-            {
-                if (FilterLine(line, _groupBySelector) != null)
-                    return line;
-            }
-            foreach (var line in x.PayloadLines)
-            {
-                if (FilterLine(line, _groupBySelector) != null)
-                    return line;
-            }
-
-            return null!;
-        };
 
         var queues = await Api.GetQueueSummariesAsync();
         _queueNames = queues
@@ -306,6 +289,22 @@ public partial class Queue : IAsyncDisposable
         {
             _dataGrid.SelectedItems.Add(messageItem);
         }
+    }
+
+    object GroupMessagesBy(MessageItem messageItem)
+    {
+        foreach (var line in messageItem.HeaderLines)
+        {
+            if (FilterLine(line, _groupBySelector) != null)
+                return line;
+        }
+        foreach (var line in messageItem.PayloadLines)
+        {
+            if (FilterLine(line, _groupBySelector) != null)
+                return line;
+        }
+
+        return null!;
     }
 
     public ValueTask DisposeAsync()
