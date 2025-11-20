@@ -14,7 +14,7 @@ pub struct RmqBackground {
 }
 
 impl RmqBackground {
-    pub fn new(rmq: Arc<Rabbitmq>) -> RmqBackground {
+    pub fn new(rmq: Arc<Rabbitmq>, update_interval: Duration) -> RmqBackground {
         let notify_worker = Arc::new(Notify::new());
         let (sender, _) = watch::channel(vec![]);
 
@@ -26,7 +26,7 @@ impl RmqBackground {
             tokio::spawn(async move {
                 loop {
                     notify_worker.notified().await;
-                    update_counter(&sender, &rmq).await;
+                    update_counter(&sender, &rmq, update_interval).await;
                 }
             });
         }
@@ -44,7 +44,11 @@ impl RmqBackground {
     }
 }
 
-async fn update_counter(sender: &Sender<Vec<QueueCounters>>, rmq: &Rabbitmq) {
+async fn update_counter(
+    sender: &Sender<Vec<QueueCounters>>,
+    rmq: &Rabbitmq,
+    update_interval: Duration,
+) {
     debug!("Enter update_counter");
 
     if sender.receiver_count() == 0 {
@@ -66,6 +70,6 @@ async fn update_counter(sender: &Sender<Vec<QueueCounters>>, rmq: &Rabbitmq) {
             return;
         };
 
-        time::sleep(Duration::from_secs(5)).await;
+        time::sleep(update_interval).await;
     }
 }

@@ -1,13 +1,14 @@
 mod api;
 mod args;
+mod check_version;
 mod database;
 mod dtos;
 mod rabbitmq;
 mod rmq_background;
 mod types;
-mod check_version;
 
 use crate::args::Args;
+use crate::check_version::show_notification_if_new_version_available;
 use crate::database::Database;
 use crate::rabbitmq::Rabbitmq;
 use crate::rmq_background::RmqBackground;
@@ -17,7 +18,7 @@ use log::{error, info, LevelFilter};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use crate::check_version::show_notification_if_new_version_available;
+use std::time::Duration;
 
 #[tokio::main]
 async fn main() {
@@ -36,7 +37,10 @@ async fn run() -> Result<()> {
 
     let rmq_client =
         Arc::new(Rabbitmq::connect(&args.url, &args.vhost, args.show_exclusive_queues).await?);
-    let rmq_background = RmqBackground::new(Arc::clone(&rmq_client));
+    let rmq_background = RmqBackground::new(
+        Arc::clone(&rmq_client),
+        Duration::from_secs(args.update_interval as u64),
+    );
     let connection_info = rmq_client.get_connection_info();
     let database = Database::new(&connection_info.domain, &connection_info.vhost)?;
     let wwwroot_dir = get_wwwroot_directory()?;
