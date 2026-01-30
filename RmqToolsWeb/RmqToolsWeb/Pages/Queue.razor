@@ -100,30 +100,43 @@
                         </div>
                     </summary>
                     
+                    @{
+                        var headersAreEmpty = true;
+                    }
                     @if (_showMessageParts is ShowMessageParts.Headers or ShowMessageParts.Both)
                     {
+                        var notEmptyLines = context.Item.HeaderLines
+                            .Select(line => FilterLine(line, _lineFilter))
+                            .Where(x => x != null);
+                      
                         <div style="white-space: pre-wrap;">
-                            @foreach (var line in context.Item.HeaderLines)
+                            @foreach (var line in notEmptyLines)
                             {
-                                <Highlighter Text="@FilterLine(line, _lineFilter)" Token="@_lineFilter"/>
+                                headersAreEmpty = false;
+                                <Highlighter Text="@line" Token="@_lineFilter"/>
                             }
                         </div>
-
-                        @if (_showMessageParts is ShowMessageParts.Both)
-                        {
-                            <br/>
-                        }
                     }
 
                     @if (_showMessageParts is ShowMessageParts.Payload or ShowMessageParts.Both)
                     {
+                        var notEmptyLines = context.Item.PayloadLines
+                            .Select(line => FilterLine(line, _lineFilter))
+                            .Where(x => x != null);
+                        var separatorAdded = false;
+                        
                         <MudText Color="Color.Info">
                             <pre>
-                            @foreach (var line in context.Item.PayloadLines)
-                            {
-                                <Highlighter Text="@FilterLine(line, _lineFilter)" Token="@_lineFilter"/>
-                            }
-                        </pre>
+                                @foreach (var line in notEmptyLines)
+                                {
+                                    if (!separatorAdded && !headersAreEmpty)
+                                    {
+                                        separatorAdded = true;
+                                        <br/>
+                                    }
+                                    <Highlighter Text="@line" Token="@_lineFilter"/>
+                                }
+                            </pre>
                         </MudText>
                     }
                 </details>
