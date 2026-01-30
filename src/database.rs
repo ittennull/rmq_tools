@@ -5,8 +5,8 @@ use rusqlite::{Connection, OptionalExtension, Row, ToSql};
 use serde_json::Map;
 use thiserror::Error;
 
-pub type QueueId = u64;
-pub type MessageId = u64;
+pub type QueueId = u32;
+pub type MessageId = u32;
 
 pub struct Database {
     connection: Connection,

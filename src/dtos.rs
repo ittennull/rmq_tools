@@ -41,8 +41,8 @@ pub struct LoadMessagesByQueueNameResponse {
 pub struct QueueSummary {
     pub queue_id: Option<QueueId>,
     pub name: String,
-    pub message_count_in_rmq: u64,
-    pub message_count_in_db: u64,
+    pub message_count_in_rmq: u32,
+    pub message_count_in_db: u32,
     pub exclusive: bool,
 }
 

@@ -21,6 +21,6 @@ pub mod db_types{
     pub struct LocalQueue {
         pub id: QueueId,
         pub name: String,
-        pub message_count: u64,
+        pub message_count: u32,
     }
 }
