@@ -72,11 +72,17 @@
         MultiSelection="true" @bind-SelectedItems="_selectedMessages" SelectOnRowClick="false"
         Filterable="true" FilterMode="DataGridFilterMode.ColumnFilterRow" FilterCaseSensitivity="DataGridFilterCaseSensitivity.CaseInsensitive">
     <Columns>
-        <SelectColumn T="MessageItem" Hideable="false" />
+        @if (_readonlyMode is false)
+        {
+            <SelectColumn T="MessageItem" Hideable="false"/>
+        }
 
         <PropertyColumn Property="x => x.CombinedString" Title="Message" Groupable="@GroupingEnabled" GroupBy="@(x => GroupMessagesBy(x))" Grouping="@GroupingEnabled">
             <GroupTemplate>
-                <MudButton Color="Color.Default" Variant="Variant.Outlined" Class="mx-3" Size="Size.Small" OnClick="@(() => SelectAllInGroup(context.Grouping!))">Select</MudButton>
+                @if (_readonlyMode is false)
+                {
+                    <MudButton Color="Color.Default" Variant="Variant.Outlined" Class="mx-3" Size="Size.Small" OnClick="@(() => SelectAllInGroup(context.Grouping!))">Select</MudButton>
+                }
                 <b>@(context.Grouping.Count())</b> : @(context.Grouping.Key)
                 @if (context.Grouping.Key == null)
                 {
@@ -99,7 +105,7 @@
                             </div>
                         </div>
                     </summary>
-                    
+
                     @{
                         var headersAreEmpty = true;
                     }
@@ -108,7 +114,7 @@
                         var notEmptyLines = context.Item.HeaderLines
                             .Select(line => FilterLine(line, _lineFilter))
                             .Where(x => x != null);
-                      
+
                         <div style="white-space: pre-wrap;">
                             @foreach (var line in notEmptyLines)
                             {
@@ -124,7 +130,7 @@
                             .Select(line => FilterLine(line, _lineFilter))
                             .Where(x => x != null);
                         var separatorAdded = false;
-                        
+
                         <MudText Color="Color.Info">
                             <pre>
                                 @foreach (var line in notEmptyLines)
@@ -134,6 +140,7 @@
                                         separatorAdded = true;
                                         <br/>
                                     }
+
                                     <Highlighter Text="@line" Token="@_lineFilter"/>
                                 }
                             </pre>
