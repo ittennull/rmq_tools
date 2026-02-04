@@ -58,7 +58,7 @@ public class WebsocketApi(Uri uri) : IAsyncDisposable
         await _cts.CancelAsync();
         _cts.Dispose();
         
-        await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Normal closure", CancellationToken.None);
+        _webSocket.Abort();
         _webSocket.Dispose();
     }
 }
