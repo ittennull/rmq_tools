@@ -4,7 +4,7 @@ version = "0.7.1"
 edition = "2024"
 
 [dependencies]
-rabbitmq_http_client = { version = "0.66", default-features = false, features = ["async", "native-tls"] }
+rabbitmq_http_client = { version = "0.76.0", default-features = false, features = ["async", "native-tls"] }
 clap = { version = "4.5", features = ["derive", "cargo"] }
 url = " 2.5"
 axum = { version = "0.8", features = ["json", "ws"] }

@@ -1,0 +1,50 @@
+<MudDialog >
+    <DialogContent>
+        <div class="mb-2">Delay in ms between sending each message</div>
+        <MudNumericField @bind-Value="@_delay" Variant="Variant.Text" Min="1" Max="10000" Immediate="true" />
+
+        <div class="mt-5">
+            <MudText Typo="Typo.body2">
+                Estimated time to finish: @(MessagesCount * _delay / 1000.0) sec
+            </MudText>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="@_isSending" Variant="Variant.Filled">
+            @if (_isSending)
+            {
+                <MudProgressCircular Color="Color.Default" Size="Size.Small" Indeterminate="true"/>
+            }
+            else
+            {
+                @:Start
+            }
+        </MudButton>
+        <MudButton OnClick="Cancel" Disabled="@_isSending" Variant="Variant.Outlined">Cancel</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; }
+    
+    [Parameter] public uint QueueId { get; set; }
+    [Parameter] public List<uint> MessageIds { get; set; }
+    [Parameter] public string MoveToQueue { get; set; }
+    [Parameter] public int MessagesCount { get; set; }
+    
+    [Inject] Api Api { get; set; } = null!;
+
+    int _delay = 100;
+    bool _isSending;
+
+    private async Task Submit()
+    {
+        _isSending = true;
+        await Api.SendMessagesToQueueAsync(QueueId, MessageIds, MoveToQueue, _delay);
+        
+        MudDialog.Close();
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

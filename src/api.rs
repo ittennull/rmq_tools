@@ -18,6 +18,7 @@ use axum::{Json, Router};
 use log::{debug, error, info};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
@@ -159,7 +160,20 @@ async fn send_messages(
     let messages_len = messages.len();
 
     // publish messages
-    for message in messages.into_iter() {
+    for (i, message) in messages.into_iter().enumerate() {
+        if i > 0 {
+            if request.send_delay_ms > 0 {
+                tokio::time::sleep(Duration::from_millis(request.send_delay_ms)).await;
+            }
+
+            if i % 1000 == 0 {
+                info!(
+                    "[progress] Sent {}/{} messages to queue {}",
+                    i, messages_len, request.destination_queue_name
+                );
+            }
+        }
+
         guarded
             .rabbitmq
             .send_message(
@@ -174,7 +188,7 @@ async fn send_messages(
     guarded.database.delete_messages(&message_selector)?;
 
     info!(
-        "Sent {} messages to queue {}",
+        "Sent all {} messages to queue {}",
         messages_len, request.destination_queue_name
     );
 

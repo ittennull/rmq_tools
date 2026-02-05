@@ -55,6 +55,7 @@ pub struct DeleteMessagesRequest {
 pub struct SendMessagesRequest {
     pub message_ids: Vec<MessageId>,
     pub destination_queue_name: String,
+    pub send_delay_ms: u64,
 }
 
 #[derive(Serialize)]

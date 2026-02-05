@@ -15,9 +15,9 @@ public class Api(HttpClient http)
         response.EnsureSuccessStatusCode();
     }
     
-    public async Task SendMessagesToQueueAsync(uint queueId, IEnumerable<uint> messageIds, string moveToQueue)
+    public async Task SendMessagesToQueueAsync(uint queueId, IEnumerable<uint> messageIds, string moveToQueue, int delay = 0)
     {
-        var body = new SendMessagesRequest(moveToQueue, messageIds);
+        var body = new SendMessagesRequest(moveToQueue, messageIds, delay);
         using var response = await http.PostAsJsonAsync($"/api/queues/{queueId}/messages/send", body, MySourceGenerationContext.Default.SendMessagesRequest);
         response.EnsureSuccessStatusCode();
     }

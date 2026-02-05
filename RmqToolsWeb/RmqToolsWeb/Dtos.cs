@@ -9,7 +9,7 @@ public record QueueSummary(uint? QueueId, string Name, bool Exclusive, int Messa
 public record LoadMessagesByQueueNameResponse(uint QueueId, List<Message> Messages);
 public record Message(uint Id, string Payload, Dictionary<string, JsonElement> Headers);
 public record DeleteMessagesRequest(IEnumerable<uint> MessageIds);
-public record SendMessagesRequest(string DestinationQueueName, IEnumerable<uint> MessageIds);
+public record SendMessagesRequest(string DestinationQueueName, IEnumerable<uint> MessageIds, int? SendDelayMs = null);
 public record QueueCounters(string QueueName, int Messages);
 
 

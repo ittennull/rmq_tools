@@ -145,6 +145,37 @@ public partial class Queue : IAsyncDisposable
         
         _loading = false;
     }
+    
+    async Task SendMessagesToQueueWithDelay()
+    {
+        var options = new DialogOptions
+        {
+            BackdropClick = false, 
+            CloseOnEscapeKey = false,
+            MaxWidth = MaxWidth.ExtraLarge
+        };
+        
+        var messageIds = _selectedMessages.Select(x => x.MessageId).ToList();
+        var messageCount = messageIds.Count > 0 ? messageIds.Count : _numberOfMessagesInDb;
+        var parameters = new DialogParameters<SendWithDelayDialog>
+        {
+            { x => x.QueueId, _queueId!.Value },
+            { x => x.MessageIds, messageIds},
+            { x => x.MoveToQueue, _moveToQueue },
+            { x => x.MessagesCount, messageCount }
+        };
+        
+        var dialog = await DialogService.ShowAsync<SendWithDelayDialog>($"Send {messageCount} {MessageWord(messageCount)} with delay", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            if (_moveToQueue == QueueName)
+                _numberOfRemoteMessagesIsOutOfDate = true;
+        
+            ClearMessagesAfterOperation();
+        }
+    }
 
     void ClearMessagesAfterOperation()
     {

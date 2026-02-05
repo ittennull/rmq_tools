@@ -43,6 +43,7 @@
                 var messages = MessageWord(_selectedMessages.Count);
             }
             <MudIconButton Icon="@Icons.Material.Filled.Send" Color="Color.Warning" OnClick="SendMessagesToQueue" title="@($"Send {howMany} {messages} to specified queue")" Disabled="@(!CanSendOrDeleteMessages)"/>
+            <MudIconButton Icon="@Icons.Material.Filled.ScheduleSend" Color="Color.Warning" OnClick="SendMessagesToQueueWithDelay" title="@($"Send {howMany} {messages} to specified queue with delay")" Disabled="@(!CanSendOrDeleteMessages)"/>
             <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" Color="Color.Error" OnClick="DeleteMessages" title="@($"Delete {howMany} {messages}")" Disabled="@(!CanSendOrDeleteMessages)"/>
         </MudStack>
     }
