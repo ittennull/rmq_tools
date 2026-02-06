@@ -132,7 +132,7 @@
                             .Where(x => x != null);
                         var separatorAdded = false;
 
-                        <MudText Color="Color.Info">
+                        <MudText Style="@($"color:{Colors.Green.Darken3};")">
                             <pre>
                                 @foreach (var line in notEmptyLines)
                                 {

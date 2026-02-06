@@ -3,7 +3,7 @@
 @inject NavigationManager Navigation
 
 @* Required *@
-<MudThemeProvider />
+<MudThemeProvider @ref="_themeProvider" />
 <MudPopoverProvider />
 
 @* Needed for dialogs *@
@@ -40,10 +40,12 @@
     EnvInfo? _envInfo;
     string _layoutClasses = "d-flex flex-column ";
     string _toolBarClasses = "pa-1 ma-0 d-flex flex-row flex-wrap align-center ";
+    MudThemeProvider _themeProvider;
 
     protected override async Task OnInitializedAsync()
     {
         _envInfo = await Api.GetEnvInfoAsync();
+        var isDarkMode = await _themeProvider.GetSystemDarkModeAsync();
         
         _layoutClasses += _envInfo.ImportanceLevel switch
         {
@@ -53,7 +55,7 @@
         
         _toolBarClasses += _envInfo.ImportanceLevel switch
         {
-            1 or 2 => "toolbar-importance",
+            1 or 2 => isDarkMode ? "toolbar-importance-dark" : "toolbar-importance-light",
             _ => "default-toolbar"
         };
     }
